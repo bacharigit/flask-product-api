@@ -1,0 +1,44 @@
+services:
+
+    flask:
+        build: ./flask
+        image: bacharidocker/flask-product-api:v1.0.0
+        container_name: flask-api
+
+        ports:
+          -  "5000:5000"
+
+        depends_on:
+            mysql:
+                condition: service_healthy
+
+        environment:
+            DB_HOST: mysql-api
+            DB_NAME: store
+            DB_USER: root
+            DB_PASSWORD: ${DB_PASSWORD}
+
+
+
+    mysql:
+        image: mysql:8.0
+        container_name: mysql-api
+
+        environment:
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_DATABASE: ${DB_NAME}
+
+        volumes:
+           -  mysql-data:/var/lib/mysql
+
+        healthcheck:
+           test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+           interval: 5s
+           timeout: 5s
+           retries: 20
+
+
+
+
+volumes:
+    mysql-data:
