@@ -1,14 +1,15 @@
 # Flask Product REST API
 
 > **Version:** v1.0.0
+> **Current development:** Testing and architecture refactorung
 
-A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**, and **Docker Compose**.
+A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**, and **Docker Compose**, and **pytest**.
 
-This project provides product CRUD operations through a REST API using JSON instead of server-rendered HTML pages.
-
----
+This project provides product CRUD operations through a REST API using JSON .It  is also being developed  with an emphasis on understanding Flask application structure, database communication, testing, fixtures, configuration.
 
 ## Features
+
+### API
 
 * Product CRUD operations
 * JSON responses
@@ -19,12 +20,38 @@ This project provides product CRUD operations through a REST API using JSON inst
 * DELETE products
 * Input validation
 * Error handling
-* MySQL database
+* HTTP 404 handling
+* pagination
+* Configurable page size
+
+### Database
+
+* MySQL 8.0
 * SQLAlchemy ORM
-* Docker
+* Persistent MySQL data using Docker volumes
+
+### Testing
+
+* pytest
+* Flask test client
+* Application Factory pattern
+* Dedicated test configuration
+* Dedicated test database
+* pytest fixtures
+* Automatic test cleanup
+* Product test fixtures
+* API endpoint testing
+* Pagination testing
+* Validation testing
+
+### Docker
+
+* Dockerized Flask application
 * Docker Compose
-* Environment variables
+* Flask and MySQL containers
 * MySQL health check
+* Environment variable configuration
+* Persistent MySQL volume
 
 ---
 
@@ -49,22 +76,81 @@ This project provides product CRUD operations through a REST API using JSON inst
 * Flask-SQLAlchemy
 * MySQL
 * PyMySQL
+* pytest
 * Docker
 * Docker Compose
 
----
-
-## Relationship to the Previous Project
-
-This project is the REST API evolution of the previous **Flask Store CRUD** application.
-
-The previous project used server-rendered HTML pages with Jinja2 templates.
-
-This project replaces the HTML-based interface with a REST API that communicates using JSON.
-
-The project continues to use MySQL and SQLAlchemy for product data management.
 
 ---
+
+## Pagination
+
+The `GET /api/products` endpoint supports pagination using the `page` and `per_page` query parameters.
+
+Example:
+
+```text
+/api/products?page=2&per_page=10
+```
+
+Where:
+
+* `page` specifies the page number.
+* `per_page` specifies how many products are returned per page.
+
+The API validates both parameters.
+
+For example:
+
+```text
+/api/products?page=0
+```
+
+returns:
+
+```json
+{
+  "error": "page must be greater than or equal to 1"
+}
+```
+
+An invalid `per_page` value also returns a `400 Bad Request`.
+
+Example:
+
+```text
+/api/products?per_page=101
+```
+returns:
+
+```json
+{
+  "error": "per_page must be between 1 and 100"
+}
+```
+
+The response includes pagination metadata:
+
+```json
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Keyboard",
+      "price": 100,
+      "stock": 10
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 10,
+    "total": 1,
+    "pages": 1
+  }
+}
+```
+
+Pagination is implemented using SQLAlchemy `limit()` and `offset()`.
 
 ## Project Structure
 
@@ -75,43 +161,214 @@ The project continues to use MySQL and SQLAlchemy for product data management.
 ├── .gitignore
 ├── README.md
 │
-└── flask
-    ├── Dockerfile
-    ├── main.py
-    ├── models.py
-    └── requirements.txt
+├── flask
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── main.py
+│   ├── models.py
+│   ├── requirements.txt
+│   │
+│   └── tests
+│       ├── conftest.py
+│       ├── __init__.py
+│       └── test_products.py
+│
+└── mysql
+    └── init
 ```
 
 > The `.env` file is intentionally not included in the repository because it contains sensitive configuration.
 
 ---
 
-## Docker
+# Application Architecture
 
-The application runs with Docker Compose using two containers:
+The application uses the **Application Factory pattern**.
 
-* Flask API
-* MySQL 8.0
+Instead of creating the Flask application immediately when `main.py` is imported, the project defines:
 
-The Flask container communicates with the MySQL container through the Docker Compose network.
-
-### Start the application
-
-First, create the environment file from the example:
-
-```bash
-cp .env.example .env
+```python
+create_app()
 ```
 
-Edit `.env` and provide your database configuration.
+The application is created when the factory is called.
 
-Then build and start the application:
+This provides a cleaner separation between:
+
+* application creation
+* configuration
+* database initialization
+* testing
+* normal application execution
+
+The structure allows pytest to create a separate Flask application using `TestingConfig`.
+
+---
+
+
+## Normal Application Execution
+
+When the application is started with Docker Compose:
 
 ```bash
 sudo docker compose up --build
 ```
 
-The API is available at:
+the general flow is:
+
+```text
+Docker Compose
+      │
+      ▼
+Flask Container
+      │
+      ▼
+main.py
+      │
+      ├── models.py
+      │
+      └── config.py
+      │
+      ▼
+create_app()
+      │
+      ├── Load configuration
+      ├── Configure database URI
+      ├── Initialize SQLAlchemy
+      ├── Create database tables
+      └── Register routes
+      │
+      ▼
+Flask Development Server
+      │
+      ▼
+HTTP Requests
+      │
+      ▼
+SQLAlchemy
+      │
+      ▼
+MySQL
+```
+
+---
+
+# Testing Architecture
+
+Tests are located in:
+
+```text
+flask/tests/
+```
+
+pytest uses fixtures defined in:
+
+```text
+flask/tests/conftest.py
+```
+
+The test application is created using:
+
+```python
+create_app(TestingConfig)
+```
+
+This means the tests use a separate database:
+
+```text
+store_test
+```
+
+rather than the normal application database.
+
+This prevents test data from being mixed with development data.
+
+---
+## Test Fixtures
+
+The project currently uses several pytest fixtures.
+
+### `app`
+
+Creates the Flask application using `TestingConfig`.
+
+```python
+@pytest.fixture
+def app():
+    return create_app(TestingConfig)
+```
+
+### `client`
+
+Creates Flask's test client.
+
+```python
+@pytest.fixture
+def client(app):
+    return app.test_client()
+```
+
+This allows tests to make HTTP requests without starting a real web server.
+
+For example:
+
+```python
+response = client.get("/api/products")
+```
+### `product`
+
+Creates a known test product for tests that need an existing product.
+
+```python
+@pytest.fixture
+def product(app):
+    ...
+```
+
+### `clean_products`
+
+Automatically removes test products after each test.
+
+The test database is dedicated to automated testing, so clearing the product table after each test keeps tests isolated.
+
+---
+
+# Running the Application
+
+## Prerequisites
+
+Install:
+
+* Docker
+* Docker Compose
+
+---
+
+## Environment Configuration
+
+Create the `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+Then configure the required values.
+
+Example: 
+
+```env
+DB_PASSWORD=your-database-password
+DB_NAME=store
+TEST_DB_NAME=store_test
+```
+## Build and start
+
+Start the application:
+
+```bash
+sudo docker compose up --build
+```
+
+The API will be available at:
 
 ```text
 http://localhost:5000
@@ -123,7 +380,9 @@ Test the API:
 http://localhost:5000/api/hello
 ```
 
-### Stop the application
+---
+
+## Stop the Application
 
 Press:
 
@@ -136,112 +395,80 @@ or run:
 ```bash
 sudo docker compose down
 ```
+# MySQL
 
-### MySQL health check
+The application uses MySQL 8.0.
 
-The MySQL container includes a health check to verify that MySQL is ready to accept connections.
+The MySQL service is defined in:
 
-The database data is stored in a named Docker volume:
+```text
+docker-compose.yml
+```
+
+The database uses a named Docker volume:
 
 ```yaml
 volumes:
   - mysql-data:/var/lib/mysql
 ```
 
-This allows the MySQL data to persist when containers are stopped or recreated.
+This allows database data to persist when containers are stopped or recreated.
+
+MySQL also has a health check so that the Flask service can wait for MySQL to become ready.
+
+---
+# Testing
+
+Tests can be executed inside a temporary Flask container.
+
+Run:
+
+```bash
+sudo docker compose run --rm flask pytest
+```
+
+The `--rm` option removes the temporary test container after pytest finishes.
+
+The tests use the dedicated:
+
+```text
+store_test
+```
+
+database.
+
+After the tests complete, the test product data is cleaned up.
 
 ---
 
-## Environment Configuration
+## Test Coverage
 
-Sensitive configuration is stored in a local `.env` file.
+The test suite covers areas including:
 
-The `.env` file is ignored by Git and should never be committed to GitHub.
-
-Create the `.env` file from the provided example:
-
-```bash
-cp .env.example .env
-```
-
-Example `.env`:
-
-```env
-DB_PASSWORD=your-database-password
-DB_NAME=store
-```
-
-The Flask application receives these values through environment variables.
-
-The MySQL container uses the same environment variables to configure the database.
-
-The repository contains `.env.example` as a safe configuration template.
+* `/api/hello`
+* Getting products
+* Creating products
+* Getting individual products
+* Updating products with PUT
+* Updating products with PATCH
+* Deleting products
+* Missing product handling
+* Missing JSON bodies
+* Missing product names
+* Missing prices
+* Missing stock values
+* Invalid price types
+* Invalid stock types
+* Negative prices
+* Negative stock
+* Boolean validation
+* Response status codes
+* JSON response data
+* Invalid pagination parameters
+* Pagination page boundaries
+* Pagination metadata
 
 ---
-
-## Testing
-
-The API can be tested using `curl` from the terminal.
-
-### Test the API
-
-```bash
-curl http://localhost:5000/api/hello
-```
-
-Expected response:
-
-```json
-{
-  "message": "Hello from Flask API"
-}
-```
-
-### Get all products
-
-```bash
-curl http://localhost:5000/api/products
-```
-
-### Get one product
-
-```bash
-curl http://localhost:5000/api/products/1
-```
-
-### Create a product
-
-```bash
-curl -X POST http://localhost:5000/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name":"keyboard","price":100,"stock":15}'
-```
-
-### Replace a product with PUT
-
-PUT requires the complete product data:
-
-```bash
-curl -X PUT http://localhost:5000/api/products/1 \
-  -H "Content-Type: application/json" \
-  -d '{"name":"mechanical keyboard","price":150,"stock":20}'
-```
-
-### Partially update a product with PATCH
-
-PATCH can update only the fields that are provided:
-
-```bash
-curl -X PATCH http://localhost:5000/api/products/1 \
-  -H "Content-Type: application/json" \
-  -d '{"price":175}'
-```
-
-### Delete a product
-
-```bash
-curl -X DELETE http://localhost:5000/api/products/1
-```
 
 ### Validation testing
 
@@ -259,6 +486,7 @@ Examples of invalid data include:
 * Boolean values used as price or stock
 * Missing JSON request body
 
+Pagination parameters are also validated.
 A nonexistent product returns HTTP `404 Not Found`.
 
 ---
@@ -289,37 +517,98 @@ Docker Compose is recommended for running the complete application because the A
 
 ## Version History
 
-### v1.0.0
+### v1.0.0 - Initial REST API
 
-* Initial Flask REST API
+Completed:
+
+* Flask REST API
 * Product CRUD operations
 * GET, POST, PUT, PATCH, and DELETE endpoints
-* MySQL integration
+* MySQL 
 * SQLAlchemy ORM
 * JSON responses
 * Input validation
 * Error handling
-* Docker Compose support
+* Docker Compose 
 * MySQL health check
 * Environment variable configuration
 
+
+### Testing Phase
+
+Completed:
+
+* pytest
+* Flask test client
+* API endpoint tests
+* Validation tests
+* Dedicated test database
+* pytest fixtures
+* Automatic test cleanup
+
 ---
 
-## Future Improvements
+### v1.1.0 — API Features
+Completed:
 
-Planned features:
-
-* User authentication
-* API documentation with Swagger/OpenAPI
-* Automated tests
-* Better project structure
+* Application Factory pattern
+* `TestingConfig`
+* Dedicated test database configuration
+* Improved fixture architecture
 * Pagination
-* Search and filtering
-* Product images
+* Pagination validation
+* Pagination metadata
+* SQLAlchemy `limit()` and `offset()`
+* Improved API response structure
+* Expanded automated test coverage
+* 38 passing tests
+
+### Future Features
+
+Planned:
+
+* Search
+* Filtering
+* Sorting
+* Better API error responses
+
+
+### v1.2.0 — Product Images
+
+Planned:
+
+* Product image uploads
+* Image validation
+* Image replacement
+* Image cleanup
+* Persistent image storage
+
+### Production
+
+Planned:
+
+* Gunicorn
+* Nginx
+* Production Docker image
 * Database migrations
-* Improved error handling
 * CI/CD with GitHub Actions
 
+### Advanced
+
+Planned:
+
+* User authentication
+* Authorization
+* Swagger/OpenAPI documentation
+* Improved architecture
+* Deployment
+
+---
+# Docker Image
+
+The application image is available on Docker Hub:
+
+https://hub.docker.com/r/bacharidocker/flask-product-api
 ---
 
 ## Author

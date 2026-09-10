@@ -2,7 +2,7 @@ services:
 
     flask:
         build: ./flask
-        image: bacharidocker/flask-product-api:v1.0.0
+        image: bacharidocker/flask-product-api:v1.1.0
         container_name: flask-api
 
         ports:
@@ -30,6 +30,8 @@ services:
 
         volumes:
            -  mysql-data:/var/lib/mysql
+           -  ./mysql/init:/docker-entrypoint-initdb.d
+
 
         healthcheck:
            test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
