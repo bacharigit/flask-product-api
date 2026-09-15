@@ -1,6 +1,6 @@
 # Flask Product REST API
 
-> **Version:** v1.0.0
+> **Version:** v1.2.0
 > **Current development:** Testing and architecture refactorung
 
 A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**, and **Docker Compose**, and **pytest**.
@@ -22,13 +22,20 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * Error handling
 * HTTP 404 handling
 * pagination
+* Search
+* Sorting
+* Filtering
+* Combined query parameters
 * Configurable page size
+* Pagination metadata
+
 
 ### Database
 
 * MySQL 8.0
 * SQLAlchemy ORM
 * Persistent MySQL data using Docker volumes
+* Separate test database
 
 ### Testing
 
@@ -43,6 +50,8 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * API endpoint testing
 * Pagination testing
 * Validation testing
+* Error response testing
+* **66 passing tests**
 
 ### Docker
 
@@ -52,7 +61,7 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * MySQL health check
 * Environment variable configuration
 * Persistent MySQL volume
-
+* Docker Hub image
 ---
 
 ## API Endpoints
@@ -69,19 +78,10 @@ This project provides product CRUD operations through a REST API using JSON .It 
 
 ---
 
-## Tech Stack
+# API Querying
 
-* Python
-* Flask
-* Flask-SQLAlchemy
-* MySQL
-* PyMySQL
-* pytest
-* Docker
-* Docker Compose
+The `GET /api/products` endpoint supports several query parameters.
 
-
----
 
 ## Pagination
 
@@ -110,11 +110,12 @@ returns:
 
 ```json
 {
-  "error": "page must be greater than or equal to 1"
+  "error": "page must be greater than or equal to 1",
+  "status": 400
 }
 ```
 
-An invalid `per_page` value also returns a `400 Bad Request`.
+`per_page` must be between `1` and `100`.
 
 Example:
 
@@ -125,8 +126,10 @@ returns:
 
 ```json
 {
-  "error": "per_page must be between 1 and 100"
+  "error": "per_page must be between 1 and 100",
+  "status": 400
 }
+
 ```
 
 The response includes pagination metadata:
@@ -151,6 +154,246 @@ The response includes pagination metadata:
 ```
 
 Pagination is implemented using SQLAlchemy `limit()` and `offset()`.
+
+
+
+## Search
+
+Products can be searched by name using the `search` query parameter.
+
+Example:
+
+```text
+/api/products?search=keyboard
+```
+
+The API searches product names using a partial match.
+
+Search can also be combined with pagination:
+
+```text
+/api/products?search=keyboard&page=1&per_page=10
+```
+
+---
+
+## Sorting
+
+Products can be sorted using the `sort` query parameter.
+
+Supported fields are:
+
+* `id`
+* `name`
+* `price`
+* `stock`
+
+Examples:
+
+```text
+/api/products?sort=price
+```
+
+Sort by price in ascending order.
+
+
+```text
+/api/products?sort=-price
+```
+
+Sort by price in descending order.
+
+The `-` prefix indicates descending order.
+
+An invalid sort field returns:
+
+```json
+{
+  "error": "Invalid sort field",
+  "status": 400
+}
+```
+
+---
+
+## Filtering
+
+Products can be filtered using price and stock ranges.
+
+### Price filtering
+
+```text
+/api/products?min_price=100
+```
+
+```text
+/api/products?max_price=500
+```
+
+Both can be used together:
+
+```text
+/api/products?min_price=100&max_price=500
+```
+
+### Stock filtering
+
+```text
+/api/products?min_stock=10
+```
+
+```text
+/api/products?max_stock=50
+```
+
+Both can also be combined:
+
+```text
+/api/products?min_stock=10&max_stock=50
+```
+
+Invalid filter values return HTTP `400 Bad Request`.
+
+---
+
+## Combining Query Parameters
+
+Search, filtering, sorting, and pagination can be combined.
+
+Example:
+
+```text
+/api/products?search=keyboard&min_price=50&max_price=500&min_stock=5&sort=-price&page=1&per_page=10
+```
+
+The query is built progressively:
+
+```text
+Product.query
+     ↓
+Search
+     ↓
+Price filtering
+     ↓
+Stock filtering
+     ↓
+Sorting
+     ↓
+Count
+     ↓
+Pagination
+     ↓
+Results
+```
+
+This allows the API to perform multiple query operations in a single request.
+
+---
+
+# API Response Structure
+
+The API uses a consistent JSON structure for successful responses and errors.
+
+## Get One Product
+
+```json
+{
+  "product": {
+    "id": 1,
+    "name": "Keyboard",
+    "price": 100,
+    "stock": 10
+  }
+}
+```
+
+## Create Product
+
+```json
+{
+  "message": "Product created successfully",
+  "product": {
+    "id": 1,
+    "name": "Keyboard",
+    "price": 100,
+    "stock": 10
+  }
+}
+```
+
+The endpoint returns HTTP `201 Created`.
+
+## Update Product
+
+```json
+{
+  "message": "Product updated successfully",
+  "product": {
+    "id": 1,
+    "name": "Keyboard",
+    "price": 150,
+    "stock": 20
+  }
+}
+```
+
+## Delete Product
+
+```json
+{
+  "message": "Product deleted successfully"
+}
+```
+
+---
+
+# Error Handling
+
+The API returns structured JSON error responses.
+
+Example:
+
+```json
+{
+  "error": "Product name is required",
+  "status": 400
+}
+```
+The HTTP status code is also returned appropriately.
+
+
+
+### HTTP 400 Bad Request
+
+Used for invalid client input, including:
+
+* Missing JSON request body
+* Missing product name
+* Missing price
+* Missing stock
+* Negative price
+* Negative stock
+* Invalid price type
+* Invalid stock type
+* Boolean values used as price or stock
+* Invalid pagination parameters
+* Invalid sorting fields
+* Invalid filter values
+
+### HTTP 404 Not Found
+
+A nonexistent product returns:
+
+```json
+{
+  "error": "Product not found",
+  "status": 404
+}
+```
+
+The application uses a centralized Flask `404` error handler.
+
+---
 
 ## Project Structure
 
@@ -439,6 +682,12 @@ database.
 
 After the tests complete, the test product data is cleaned up.
 
+The current test suite contains:
+
+```text
+66 passing tests
+```
+
 ---
 
 ## Test Coverage
@@ -467,6 +716,14 @@ The test suite covers areas including:
 * Invalid pagination parameters
 * Pagination page boundaries
 * Pagination metadata
+* Search
+* Sorting
+* Filtering
+* Combined query parameters
+* Standardized error responses
+* PUT/PATCH nonexistent product handling
+
+---
 
 ---
 
@@ -500,7 +757,7 @@ The Docker image is available on Docker Hub:
 ### Pull the released image
 
 ```bash
-docker pull bacharidocker/flask-product-api:v1.0.0
+docker pull bacharidocker/flask-product-api:v1.2.0
 ```
 
 The `latest` tag is also available:
@@ -533,18 +790,39 @@ Completed:
 * MySQL health check
 * Environment variable configuration
 
+---
 
-### Testing Phase
+## GitHub Development Checkpoint 1 — Pagination
+
+A dedicated development commit was created for the pagination feature.
 
 Completed:
 
-* pytest
+* Pagination with `page`
+* Pagination with `per_page`
+* Pagination validation
+* Pagination metadata
+* SQLAlchemy `limit()`
+* SQLAlchemy `offset()`
+* Pagination tests
+
+---
+
+## GitHub Development Checkpoint 2 — Testing Architecture
+
+A second development commit focused on improving the testing architecture.
+
+Completed:
+
+* pytest setup
 * Flask test client
-* API endpoint tests
-* Validation tests
+* Application Factory pattern
+* `TestingConfig`
 * Dedicated test database
 * pytest fixtures
 * Automatic test cleanup
+* Improved test organization
+* Expanded API endpoint tests
 
 ---
 
@@ -561,19 +839,31 @@ Completed:
 * SQLAlchemy `limit()` and `offset()`
 * Improved API response structure
 * Expanded automated test coverage
-* 38 passing tests
 
-### Future Features
+---
+## v1.2.0 — API Querying and Quality
 
-Planned:
+Completed:
 
 * Search
-* Filtering
 * Sorting
-* Better API error responses
+* Filtering
+* Combined query parameters
+* Improved validation
+* Standardized error response structure
+* Centralized HTTP 404 handling
+* Consistent product response structure
+* PUT/PATCH nonexistent product tests
+* Expanded API test coverage
+* **66 passing tests**
 
+This release represents the completion of the current API querying and basic API quality phase.
 
-### v1.2.0 — Product Images
+---
+
+# Future Roadmap
+
+## Product Features
 
 Planned:
 
@@ -582,8 +872,54 @@ Planned:
 * Image replacement
 * Image cleanup
 * Persistent image storage
+* Product categories
+* Product relationships
 
-### Production
+---
+
+
+
+### Testing and API Quality
+
+Planned:
+
+* Further test organization
+* API contract testing
+* Additional edge-case testing
+* Code quality improvements
+* Refactoring
+
+---
+
+## Professional API Architecture
+
+Planned:
+
+* Flask Blueprints
+* Service layer
+* Repository/data-access layer
+* Schemas and serialization
+* Stronger request validation
+* Environment-specific configuration
+
+---
+
+## Authentication and Security
+
+Planned:
+
+* Authentication
+* Authorization
+* Password hashing
+* JWT access tokens
+* Roles and permissions
+* CORS
+* Security best practices
+* SQL injection protection
+
+---
+
+### Docker and Production
 
 Planned:
 
@@ -591,17 +927,75 @@ Planned:
 * Nginx
 * Production Docker image
 * Database migrations
-* CI/CD with GitHub Actions
+* Container optimization
+---
 
-### Advanced
+## Kubernetes
+
+Planned after the core API and Docker workflow are further developed:
+
+* Kubernetes fundamentals
+* Pods
+* Deployments
+* Services
+* Namespaces
+* ConfigMaps
+* Secrets
+* Persistent Volumes
+* Persistent Volume Claims
+* Ingress
+* TLS
+* Health probes
+* Resource requests and limits
+* Horizontal Pod Autoscaling
+* `kubectl`
+* Debugging
+* Helm
+
+---
+
+## Cloud
 
 Planned:
 
-* User authentication
-* Authorization
-* Swagger/OpenAPI documentation
-* Improved architecture
-* Deployment
+* Cloud fundamentals
+* Compute
+* Networking
+* Managed databases
+* Container registries
+* Secrets management
+* API deployment
+
+---
+
+
+## CI/CD
+
+Planned:
+
+* GitHub Actions
+* Automated tests
+* Docker image builds
+* Docker image publishing
+* Deployment pipelines
+* Automated deployment
+
+---
+
+## Production and Advanced Features
+
+Planned:
+
+* Logging
+* Monitoring
+* Observability
+* Performance optimization
+* Caching
+* Database optimization
+* Rate limiting
+* Security hardening
+* Production deployment
+
 
 ---
 # Docker Image
@@ -610,6 +1004,12 @@ The application image is available on Docker Hub:
 
 https://hub.docker.com/r/bacharidocker/flask-product-api
 ---
+
+The v1.2.0 image can be pulled with:
+
+```bash
+docker pull bacharidocker/flask-product-api:v1.2.0
+```
 
 ## Author
 
