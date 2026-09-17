@@ -1,4 +1,5 @@
-from models import Product, db
+from app.extensions import db
+from app.models  import  Product
 
 def test_hello(client):
 

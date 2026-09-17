@@ -1,8 +1,9 @@
 import pytest
 
-from main import create_app
+from app  import create_app
 from config import TestingConfig
-from models import db, Product
+from app.extensions import db
+from app.models import  Product
 
 
 @pytest.fixture

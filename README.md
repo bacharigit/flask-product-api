@@ -1,7 +1,7 @@
 # Flask Product REST API
 
 > **Version:** v1.2.0
-> **Current development:** Testing and architecture refactorung
+> **Current development:** architecture refactorung
 
 A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**, and **Docker Compose**, and **pytest**.
 
@@ -28,7 +28,10 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * Combined query parameters
 * Configurable page size
 * Pagination metadata
-
+* Application factory pattern
+* Flask Blueprints for route organization
+*  Dedicated error-handling module
+*  Separated application entry point
 
 ### Database
 
@@ -359,9 +362,8 @@ Example:
   "status": 400
 }
 ```
+
 The HTTP status code is also returned appropriately.
-
-
 
 ### HTTP 400 Bad Request
 
@@ -391,7 +393,7 @@ A nonexistent product returns:
 }
 ```
 
-The application uses a centralized Flask `404` error handler.
+The application uses a centralized Flask `404` error handler located in `app/errors/handlers.py`.
 
 ---
 
@@ -405,10 +407,26 @@ The application uses a centralized Flask `404` error handler.
 ├── README.md
 │
 ├── flask
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── extensions.py
+│   │   │
+│   │   ├── errors
+│   │   │   ├── __init__.py
+│   │   │   └── handlers.py
+│   │   │
+│   │   ├── models
+│   │   │   ├── __init__.py
+│   │   │   └── product.py
+│   │   │
+│   │   └── routes
+│   │       ├── __init__.py
+│   │       ├── general.py
+│   │       └── products.py
+│   │
 │   ├── config.py
 │   ├── Dockerfile
 │   ├── main.py
-│   ├── models.py
 │   ├── requirements.txt
 │   │
 │   └── tests
@@ -420,35 +438,102 @@ The application uses a centralized Flask `404` error handler.
     └── init
 ```
 
-> The `.env` file is intentionally not included in the repository because it contains sensitive configuration.
+## Architecture
 
----
+The application uses an application factory and Flask Blueprints to keep
+application setup, routes, models, and error handling separated.
 
-# Application Architecture
+### Application Factory
 
-The application uses the **Application Factory pattern**.
+The Flask application is created through `create_app()` in:
 
-Instead of creating the Flask application immediately when `main.py` is imported, the project defines:
+```text
+app/__init__.py
+```
+The create_app() function is responsible for:
 
-```python
-create_app()
+Creating the Flask application
+Loading configuration
+Configuring the database URI
+Initializing SQLAlchemy
+Registering Blueprints
+Registering error handlers
+Creating database tables
+
+The application factory allows pytest to create a separate Flask application
+using `testConfig`.
+
+
+### Blueprints
+
+API routes are organized into Flask Blueprints:
+
+* `products_bp` — product-related API endpoints
+* `general_bp` — general API endpoints such as `/api/hello`
+
+Product routes are located in:
+
+```text
+app/routes/products.py
+```
+General API routes are located in:
+
+```text
+app/routes/general.py
 ```
 
-The application is created when the factory is called.
+### Error Handling
 
-This provides a cleaner separation between:
+Error handling is separated from application creation and stored in:
 
-* application creation
-* configuration
-* database initialization
-* testing
-* normal application execution
+```text
+app/errors/handlers.py
+```
 
-The structure allows pytest to create a separate Flask application using `TestingConfig`.
+The error handlers are registered when the application is created.
+
+### Application Entry Point
+
+`main.py` is now a thin application entry point.
+
+It imports `create_app()` from the application package and starts the Flask
+development server.
+
+The application factory itself is located in:
+
+```text
+app/__init__.py
+```
+### Application Components
+
+The main application responsibilities are separated as follows:
+
+```text
+Routes
+  ↓
+HTTP request/response handling
+
+Services
+  ↓
+Business logic
+
+Models
+  ↓
+Database structure
+
+Extensions
+  ↓
+Flask/SQLAlchemy extensions
+
+Errors
+  ↓
+Error handling
+```
+
+The service layer is planned as a future architecture step and has not yet
+been introduced.
 
 ---
-
-
 ## Normal Application Execution
 
 When the application is started with Docker Compose:
@@ -460,6 +545,7 @@ sudo docker compose up --build
 the general flow is:
 
 ```text
+
 Docker Compose
       │
       ▼
@@ -468,18 +554,15 @@ Flask Container
       ▼
 main.py
       │
-      ├── models.py
-      │
-      └── config.py
-      │
       ▼
-create_app()
+app.create_app()
       │
       ├── Load configuration
       ├── Configure database URI
       ├── Initialize SQLAlchemy
-      ├── Create database tables
-      └── Register routes
+      ├── Register Blueprints
+      ├── Register error handlers
+      └── Create database tables
       │
       ▼
 Flask Development Server
@@ -488,11 +571,17 @@ Flask Development Server
 HTTP Requests
       │
       ▼
+Routes / Blueprints
+      │
+      ▼
 SQLAlchemy
       │
       ▼
 MySQL
 ```
+
+`main.py` is only responsible for starting the application. The application
+factory and application configuration are handled by `app/__init__.py`.
 
 ---
 
@@ -519,7 +608,7 @@ create_app(TestingConfig)
 This means the tests use a separate database:
 
 ```text
-store_test
+flask/tests
 ```
 
 rather than the normal application database.
@@ -855,14 +944,30 @@ Completed:
 * Consistent product response structure
 * PUT/PATCH nonexistent product tests
 * Expanded API test coverage
-* **66 passing tests**
+* **66  tests**
 
 This release represents the completion of the current API querying and basic API quality phase.
 
 ---
+## GitHub Development Checkpoint 3 — Application Architecture
+
+A third development checkpoint focused on refactoring the application architecture.
+
+Completed:
+
+* Application Factory pattern
+* Flask Blueprints
+* Separate product and general routes
+* Dedicated error-handling module
+* Separated application entry point
+* Updated application package structure
+* Updated test architecture
+* Maintained 66 tests
+
+The next step in the architecture work is introducing a service layer.
+
 
 # Future Roadmap
-
 ## Product Features
 
 Planned:
@@ -877,8 +982,6 @@ Planned:
 
 ---
 
-
-
 ### Testing and API Quality
 
 Planned:
@@ -887,20 +990,27 @@ Planned:
 * API contract testing
 * Additional edge-case testing
 * Code quality improvements
-* Refactoring
+* Test coverage improvements
 
 ---
 
 ## Professional API Architecture
 
+Current progress:
+
+* Application Factory pattern
+* Flask Blueprints
+* Dedicated error-handling module
+* Separated application entry point
+
 Planned:
 
-* Flask Blueprints
 * Service layer
 * Repository/data-access layer
 * Schemas and serialization
 * Stronger request validation
 * Environment-specific configuration
+
 
 ---
 
@@ -1010,7 +1120,7 @@ The v1.2.0 image can be pulled with:
 ```bash
 docker pull bacharidocker/flask-product-api:v1.2.0
 ```
-
+---
 ## Author
 
 **Hossein Bachari**
