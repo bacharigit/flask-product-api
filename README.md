@@ -1,11 +1,11 @@
 # Flask Product REST API
 
 > **Version:** v1.2.0
-> **Current development:** architecture refactorung
+> **Current development:** architecture refactoring
 
-A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**, and **Docker Compose**, and **pytest**.
+A Flask REST API for managing products using **Flask**, **MySQL**, **SQLAlchemy**, **Docker**,  **Docker Compose**, and **pytest**.
 
-This project provides product CRUD operations through a REST API using JSON .It  is also being developed  with an emphasis on understanding Flask application structure, database communication, testing, fixtures, configuration.
+This project provides product CRUD operations through a REST API using JSON. It  is also being developed  with an emphasis on understanding Flask application structure, database communication, testing, fixtures, configuration.
 
 ## Features
 
@@ -32,6 +32,8 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * Flask Blueprints for route organization
 *  Dedicated error-handling module
 *  Separated application entry point
+* Service Layer
+* Repository Layer
 
 ### Database
 
@@ -66,6 +68,236 @@ This project provides product CRUD operations through a REST API using JSON .It 
 * Persistent MySQL volume
 * Docker Hub image
 ---
+
+
+## Application Architecture
+
+The application follows a layered architecture that separates HTTP handling, application logic, database access, and error handling.
+
+### Application Factory
+
+The application uses the Flask Application Factory pattern.
+
+The `create_app()` function is responsible for:
+
+* Creating the Flask application
+* Loading configuration
+* Initializing SQLAlchemy
+* Registering Blueprints
+* Registering error handlers
+* Creating database tables
+
+The application entry point is kept separate from application creation.
+
+### Routes / Blueprints
+
+Routes are responsible for HTTP-related concerns.
+
+
+* Receive HTTP requests
+* Read query parameters
+* Read JSON request data
+* Perform HTTP-level validation
+* Call the appropriate service
+* Build JSON responses
+* Return HTTP status codes
+
+Routes do not contain database queries.
+
+For example:
+
+```text
+HTTP Request
+     ↓
+Product Route
+     ↓
+Product Service
+```
+
+### Service Layer
+
+The Service Layer sits between the routes and the repository.
+
+It is responsible for application and business logic and provides an abstraction between HTTP handling and database access.
+
+For example:
+```text
+Route
+  ↓
+product_service.get_products()
+  ↓
+product_repository.get_products()
+```
+
+The current service layer is intentionally lightweight because the application's business logic is still relatively simple. As the application grows, more complex business rules can be handled here.
+
+### Repository Layer
+
+The Repository Layer is responsible for database access.
+
+It contains SQLAlchemy queries and database operations such as:
+
+* Retrieving products
+* Searching products
+* Filtering products
+* Sorting products
+* Paginating products
+* Creating products
+* Updating products
+* Deleting products
+
+For example:
+
+```text
+Service
+   ↓
+Repository
+   ↓
+SQLAlchemy
+   ↓
+MySQL
+```
+
+This keeps database-specific operations outside the routes and separates data access from application logic.
+
+### Models
+
+Models define the database structure using SQLAlchemy.
+
+The `Product` model represents the `product` database table and defines fields such as:
+
+* `id`
+* `name`
+* `price`
+* `stock`
+
+The repository uses the model when building database queries.
+
+### Extensions
+
+Flask extensions are defined separately in:
+
+```text
+app/extensions.py
+```
+
+The SQLAlchemy extension object is created there:
+
+```python
+db = SQLAlchemy()
+```
+
+The application factory initializes the extension with:
+
+```python
+db.init_app(app)
+```
+
+This keeps extension setup separate from the rest of the application.
+
+### Error Handling
+
+Error handling is implemented as a cross-cutting concern rather than as another sequential layer.
+
+Custom exceptions are defined in:
+
+```text
+app/errors/exceptions.py
+```
+
+and centralized error handlers are registered in:
+
+```text
+app/errors/handlers.py
+```
+
+For example, an invalid sort field raises:
+
+```python
+raise InvalidSortFieldError("Invalid sort field")
+```
+
+Flask then uses the registered error handler to return a standardized HTTP response.
+
+Errors can occur at different points in the request flow:
+
+```text
+Route ────────┐
+Service ──────┼──→ Error Handling
+Repository ───┘
+```
+### Architecture Summary
+Routes       → HTTP
+Services     → Business/Application Logic
+Repositories → Database Access
+Models       → Database Structure
+
+Routes
+  ↓
+Service Layer
+  ↓
+Repository Layer
+  ↓
+SQLAlchemy / Models
+  ↓
+MySQL
+
+Supporting components:
+
+Extensions → Flask / SQLAlchemy setup
+Errors     → Centralized exception handling
+
+This architecture makes the application easier to test, maintain, and extend as new features are added.
+
+### Request Flow
+
+A typical product request follows this flow:
+
+```text
+Client
+  │
+  │ HTTP Request
+  ▼
+Routes / Blueprints
+  │
+  ▼
+Service Layer
+  │
+  ▼
+Repository Layer
+  │
+  │ SQLAlchemy queries
+  ▼
+Models / SQLAlchemy
+  │
+  ▼
+MySQL
+  │
+  │ database result
+  ▼
+Repository
+  │
+  ▼
+Service
+  │
+  ▼
+Route
+  │
+  │ JSON Response
+  ▼
+Client
+```
+
+The main responsibilities are therefore:
+
+```text
+Routes       → HTTP handling
+Services     → Application / business logic
+Repositories → Database access
+Models       → Database structure
+Extensions   → Flask extension setup
+Errors       → Centralized error handling
+```
 
 ## API Endpoints
 
@@ -157,7 +389,6 @@ The response includes pagination metadata:
 ```
 
 Pagination is implemented using SQLAlchemy `limit()` and `offset()`.
-
 
 
 ## Search
@@ -400,140 +631,39 @@ The application uses a centralized Flask `404` error handler located in `app/err
 ## Project Structure
 
 ```text
-.
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-├── README.md
-│
-├── flask
-│   ├── app
+
+flask/
+├── app/
+│   ├── __init__.py
+│   ├── extensions.py
+│   ├── errors/
 │   │   ├── __init__.py
-│   │   ├── extensions.py
-│   │   │
-│   │   ├── errors
-│   │   │   ├── __init__.py
-│   │   │   └── handlers.py
-│   │   │
-│   │   ├── models
-│   │   │   ├── __init__.py
-│   │   │   └── product.py
-│   │   │
-│   │   └── routes
-│   │       ├── __init__.py
-│   │       ├── general.py
-│   │       └── products.py
-│   │
-│   ├── config.py
-│   ├── Dockerfile
-│   ├── main.py
-│   ├── requirements.txt
-│   │
-│   └── tests
-│       ├── conftest.py
+│   │   ├── exceptions.py
+│   │   └── handlers.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── product.py
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   └── product_repository.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── general.py
+│   │   └── products.py
+│   └── services/
 │       ├── __init__.py
-│       └── test_products.py
-│
-└── mysql
-    └── init
+│       └── product_service.py
+├── config.py
+├── Dockerfile
+├── main.py
+├── requirements.txt
+└── tests/
+    ├── conftest.py
+    ├── __init__.py
+    └── test_products.py
+
 ```
 
-## Architecture
-
-The application uses an application factory and Flask Blueprints to keep
-application setup, routes, models, and error handling separated.
-
-### Application Factory
-
-The Flask application is created through `create_app()` in:
-
-```text
-app/__init__.py
-```
-The create_app() function is responsible for:
-
-Creating the Flask application
-Loading configuration
-Configuring the database URI
-Initializing SQLAlchemy
-Registering Blueprints
-Registering error handlers
-Creating database tables
-
-The application factory allows pytest to create a separate Flask application
-using `testConfig`.
-
-
-### Blueprints
-
-API routes are organized into Flask Blueprints:
-
-* `products_bp` — product-related API endpoints
-* `general_bp` — general API endpoints such as `/api/hello`
-
-Product routes are located in:
-
-```text
-app/routes/products.py
-```
-General API routes are located in:
-
-```text
-app/routes/general.py
-```
-
-### Error Handling
-
-Error handling is separated from application creation and stored in:
-
-```text
-app/errors/handlers.py
-```
-
-The error handlers are registered when the application is created.
-
-### Application Entry Point
-
-`main.py` is now a thin application entry point.
-
-It imports `create_app()` from the application package and starts the Flask
-development server.
-
-The application factory itself is located in:
-
-```text
-app/__init__.py
-```
-### Application Components
-
-The main application responsibilities are separated as follows:
-
-```text
-Routes
-  ↓
-HTTP request/response handling
-
-Services
-  ↓
-Business logic
-
-Models
-  ↓
-Database structure
-
-Extensions
-  ↓
-Flask/SQLAlchemy extensions
-
-Errors
-  ↓
-Error handling
-```
-
-The service layer is planned as a future architecture step and has not yet
-been introduced.
-
----
 ## Normal Application Execution
 
 When the application is started with Docker Compose:
@@ -542,10 +672,11 @@ When the application is started with Docker Compose:
 sudo docker compose up --build
 ```
 
-the general flow is:
+the application starts through the Flask application factory.
+
+The general startup flow is:
 
 ```text
-
 Docker Compose
       │
       ▼
@@ -574,14 +705,23 @@ HTTP Requests
 Routes / Blueprints
       │
       ▼
-SQLAlchemy
+Service Layer
+      │
+      ▼
+Repository Layer
+      │
+      ▼
+SQLAlchemy / Models
       │
       ▼
 MySQL
 ```
 
-`main.py` is only responsible for starting the application. The application
-factory and application configuration are handled by `app/__init__.py`.
+`main.py` is responsible for starting the application.
+
+The application factory in `app/__init__.py` is responsible for application creation, configuration, extension initialization, Blueprint registration, error-handler registration, and database table creation.
+
+Once the application is running, HTTP requests follow the layered architecture described in the Application Architecture section.
 
 ---
 
@@ -605,17 +745,14 @@ The test application is created using:
 create_app(TestingConfig)
 ```
 
-This means the tests use a separate database:
+The tests use a dedicated test database:
 
 ```text
-flask/tests
+store_test
 ```
 
-rather than the normal application database.
+This keeps automated test data separate from the normal application database and prevents tests from modifying development data.
 
-This prevents test data from being mixed with development data.
-
----
 ## Test Fixtures
 
 The project currently uses several pytest fixtures.
@@ -647,6 +784,7 @@ For example:
 ```python
 response = client.get("/api/products")
 ```
+
 ### `product`
 
 Creates a known test product for tests that need an existing product.
@@ -657,11 +795,21 @@ def product(app):
     ...
 ```
 
+### `products`
+
+Creates multiple products for tests involving pagination, searching, sorting, filtering, and combined query parameters.
+
+```python
+@pytest.fixture
+def products(app):
+    ...
+```
+
 ### `clean_products`
 
 Automatically removes test products after each test.
 
-The test database is dedicated to automated testing, so clearing the product table after each test keeps tests isolated.
+The test database is dedicated to automated testing, so clearing the product table after each test helps keep tests isolated and repeatable.
 
 ---
 
@@ -951,8 +1099,7 @@ This release represents the completion of the current API querying and basic API
 ---
 ## GitHub Development Checkpoint 3 — Application Architecture
 
-A third development checkpoint focused on refactoring the application architecture.
-
+A third development checkpoint focuses on refactoring the application architecture and separating application responsibilities.
 Completed:
 
 * Application Factory pattern
@@ -960,14 +1107,54 @@ Completed:
 * Separate product and general routes
 * Dedicated error-handling module
 * Separated application entry point
+* Service Layer
+* Repository Layer
+* Separation of HTTP, application, and database responsibilities
 * Updated application package structure
 * Updated test architecture
 * Maintained 66 tests
 
-The next step in the architecture work is introducing a service layer.
+Current architecture:
+```text
+Routes
+  ↓
+Service Layer
+  ↓
+Repository Layer
+  ↓
+SQLAlchemy / Models
+  ↓
+MySQL
+```
+Supporting components:
 
+Extensions → Flask / SQLAlchemy setup
+Errors     → Centralized error handling
+
+The next step after completing the architecture checkpoint is to begin the DevOps learning track.
 
 # Future Roadmap
+## Professional API Architecture
+
+Completed:
+* Application Factory pattern
+* Flask Blueprints
+* Dedicated error-handling module
+* Separated application entry point
+* Service Layer
+* Repository / data-access layer
+* Separation of HTTP, application, and database responsibilities
+
+
+Planned:
+* Schemas and serialization
+* Stronger request validation
+* Environment-specific configuration
+* Database migrations
+* Further API architecture improvements
+
+---
+
 ## Product Features
 
 Planned:
@@ -993,26 +1180,42 @@ Planned:
 * Test coverage improvements
 
 ---
+DevOps Learning Track
 
-## Professional API Architecture
+## The DevOps track will be developed separately from the main API development path.
 
-Current progress:
+Planned topics:
 
-* Application Factory pattern
-* Flask Blueprints
-* Dedicated error-handling module
-* Separated application entry point
+* Git and branching workflow
+* Docker fundamentals
+* Dockerfile deeper understanding
+* Docker Compose
+* Container networking
+* Docker volumes
+* Container registries
+* CI/CD fundamentals
+* GitHub Actions
+* Automated testing pipelines
+* Docker image builds and publishing
+* Kubernetes fundamentals
+* Kubernetes deployments
+* Kubernetes Services
+* ConfigMaps
+* Secrets
+* Persistent Volumes
+* Persistent Volume Claims
+* Ingress
+* Health probes
+* Resource requests and limits
+* kubectl
+* Kubernetes troubleshooting
+* Helm
+* Terraform
+* Ansible
+* Logging and monitoring
+* Observability
 
-Planned:
-
-* Service layer
-* Repository/data-access layer
-* Schemas and serialization
-* Stronger request validation
-* Environment-specific configuration
-
-
----
+Kubernetes will be introduced after the Docker and CI/CD fundamentals are understood.
 
 ## Authentication and Security
 
@@ -1039,75 +1242,46 @@ Planned:
 * Database migrations
 * Container optimization
 ---
-
-## Kubernetes
-
-Planned after the core API and Docker workflow are further developed:
-
-* Kubernetes fundamentals
-* Pods
-* Deployments
-* Services
-* Namespaces
-* ConfigMaps
-* Secrets
-* Persistent Volumes
-* Persistent Volume Claims
-* Ingress
-* TLS
-* Health probes
-* Resource requests and limits
-* Horizontal Pod Autoscaling
-* `kubectl`
-* Debugging
-* Helm
-
----
-
 ## Cloud
 
 Planned:
 
-* Cloud fundamentals
-* Compute
-* Networking
-* Managed databases
-* Container registries
-* Secrets management
-* API deployment
-
----
+Cloud fundamentals
+Compute
+Networking
+Managed databases
+Container registries
+Secrets management
+API deployment
 
 
 ## CI/CD
 
 Planned:
 
-* GitHub Actions
-* Automated tests
-* Docker image builds
-* Docker image publishing
-* Deployment pipelines
-* Automated deployment
+GitHub Actions
+Automated tests
+Docker image builds
+Docker image publishing
+Deployment pipelines
+Automated deployment
 
----
 
 ## Production and Advanced Features
-
 Planned:
 
-* Logging
-* Monitoring
-* Observability
-* Performance optimization
-* Caching
-* Database optimization
-* Rate limiting
-* Security hardening
-* Production deployment
-
+Logging
+Monitoring
+Observability
+Performance optimization
+Caching
+Database optimization
+Rate limiting
+Security hardening
+Production deployment
 
 ---
+
 # Docker Image
 
 The application image is available on Docker Hub:

@@ -23,7 +23,7 @@ def test_get_products(client):
      assert isinstance(data, dict)
      assert "products" in data
      assert "pagination" in data
-     
+
 
 def test_get_products_pagination(client, products):
     response = client.get("/api/products?page=1&per_page=2")
