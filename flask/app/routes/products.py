@@ -5,16 +5,15 @@ from flask import Blueprint, jsonify, request, abort
 from app.models import Product
 from app.extensions import db
 
+from app.services.product_service  import (
+    get_product,
+    get_products,
+    create_product,
+    update_product,
+    delete_product as delete_product_service
+)
+
 products_bp = Blueprint("products", __name__)
-
-
-def get_product_or_404(id):
-    product = db.session.get(Product, id)
-
-    if product is None:
-        abort(404)
-
-    return product
 
 
 @products_bp.route("/api/products")
@@ -99,59 +98,24 @@ def products():
             "status": 400
         }), 400
 
-    offset = (page - 1) * per_page
+    products, total = get_products(
+        search=search,
+        sort=sort,
+        min_price=min_price,
+        max_price=max_price,
+        min_stock=min_stock,
+        max_stock=max_stock,
+        page=page,
+        per_page=per_page
+    )
 
-    query = Product.query
-
-    if search:
-        query = query.filter(
-            Product.name.like(f"%{search}%")
-        )
-
-    if min_price is not None:
-        query = query.filter(Product.price >= min_price)
-
-    if max_price is not None:
-        query = query.filter(Product.price <= max_price)
-
-    if min_stock is not None:
-        query = query.filter(Product.stock >= min_stock)
-
-    if max_stock is not None:
-        query = query.filter(Product.stock <= max_stock)
-
-    sort_fields = {
-        "id": Product.id,
-        "name": Product.name,
-        "price": Product.price,
-        "stock": Product.stock
-    }
-
-    descending = sort.startswith("-")
-    field_name = sort[1:] if descending else sort
-
-    if field_name not in sort_fields:
+    if products is None:
         return jsonify({
-            "error": "Invalid sort field",
+            "error": total,
             "status": 400
         }), 400
 
-    field = sort_fields[field_name]
-
-    if descending:
-        query = query.order_by(field.desc())
-    else:
-        query = query.order_by(field.asc())
-
-    total = query.count()
     pages = math.ceil(total / per_page)
-
-    products = (
-        query
-        .limit(per_page)
-        .offset(offset)
-        .all()
-    )
 
     products_list = []
 
@@ -178,7 +142,10 @@ def products():
 
 @products_bp.route("/api/products/<int:id>", methods=["GET", "PUT", "PATCH"])
 def product(id):
-    product = get_product_or_404(id)
+    product = get_product(id)
+
+    if product is None:
+        abort(404)
 
     if request.method == "GET":
         return jsonify({
@@ -250,11 +217,7 @@ def product(id):
             "status": 400
         }), 400
 
-    product.name = name
-    product.price = price
-    product.stock = stock
-
-    db.session.commit()
+    product = update_product(product, name, price, stock)
 
     return jsonify({
         "message": "Product updated successfully",
@@ -268,7 +231,7 @@ def product(id):
 
 
 @products_bp.route("/api/products", methods=["POST"])
-def create_product():
+def create_product_route():
     data = request.get_json(silent=True)
 
     if not data:
@@ -323,14 +286,12 @@ def create_product():
             "status": 400
         }), 400
 
-    new_product = Product(
+    new_product = create_product(
         name=name,
         price=price,
         stock=stock
     )
 
-    db.session.add(new_product)
-    db.session.commit()
 
     return jsonify({
         "message": "Product created successfully",
@@ -344,10 +305,12 @@ def create_product():
 
 @products_bp.route("/api/products/<int:id>", methods=["DELETE"])
 def delete_product(id):
-    product = get_product_or_404(id)
+    product = get_product(id)
 
-    db.session.delete(product)
-    db.session.commit()
+    if product is None:
+        abort(404)
+
+    delete_product_service(product)
 
     return jsonify({
         "message": "Product deleted successfully"

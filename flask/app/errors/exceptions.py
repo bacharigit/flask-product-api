@@ -1,0 +1,2 @@
+class InvalidSortFieldError(Exception):
+    pass
