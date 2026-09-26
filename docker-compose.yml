@@ -1,9 +1,10 @@
 services:
 
     flask:
-        build: ./flask
+        build:
+            context: ./flask
+            target: runtime
         image: bacharidocker/flask-product-api:v1.2.0
-        container_name: flask-api
 
         ports:
           -  "5000:5000"
@@ -13,16 +14,33 @@ services:
                 condition: service_healthy
 
         environment:
-            DB_HOST: mysql-api
+            DB_HOST: mysql
             DB_NAME: store
             DB_USER: root
             DB_PASSWORD: ${DB_PASSWORD}
 
 
 
+    flask-test:
+        build:
+            context: ./flask
+            target: test
+
+        depends_on:
+            mysql:
+                condition: service_healthy
+
+        environment:
+            DB_HOST: mysql
+            DB_NAME: store
+            DB_USER: root
+            DB_PASSWORD: ${DB_PASSWORD}
+            TEST_DB_NAME: store_test
+
+
     mysql:
         image: mysql:8.0
-        container_name: mysql-api
+
 
         environment:
             MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
