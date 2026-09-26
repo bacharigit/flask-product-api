@@ -12,6 +12,7 @@ permissions:
 
 jobs:
     test:
+        name: Run tests
         runs-on: ubuntu-latest
 
 
@@ -27,4 +28,31 @@ jobs:
 
           - name: Run tests
             run: docker compose run --rm --build flask-test
+
+
+    build:
+        name: Build runtime image
+        needs: test
+        runs-on: ubuntu-latest
+
+
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v6
+
+
+          - name: Build runtime image
+            run: docker build -t flask-product-api:ci ./flask
+
+
+
+          - name: Verify runtime user
+            run: |
+                test "$(docker run --rm flask-product-api:ci whoami)" = "appuser"
+
+
+          - name: Verify Gunicorn
+            run: docker run --rm flask-product-api:ci gunicorn --version
+
+
 
