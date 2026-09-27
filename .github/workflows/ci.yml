@@ -42,17 +42,62 @@ jobs:
 
 
           - name: Build runtime image
-            run: docker build -t flask-product-api:ci ./flask
+            run: docker build -t bacharidocker/flask-product-api:ci ./flask
 
 
 
           - name: Verify runtime user
             run: |
-                test "$(docker run --rm flask-product-api:ci whoami)" = "appuser"
+                test "$(docker run --rm bacharidocker/flask-product-api:ci whoami)" = "appuser"
 
 
           - name: Verify Gunicorn
-            run: docker run --rm flask-product-api:ci gunicorn --version
+            run: docker run --rm bacharidocker/flask-product-api:ci gunicorn --version
+
+
+
+    Publish:
+        name: Publish Docker image
+        if: startsWith(github.ref, 'refs/tags/v')
+        needs: build
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+
+
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v6
+
+          - name: Log in to Docker Hub
+            uses: docker/login-actions@v4
+            with:
+                username: ${{ vars.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
+         - name: Build and push Docker image
+           uses: docker/build-push-action@v7
+           with:
+               context: ./flask
+               push: true
+               tags: bacharidocker/flask-product-api:${{ github.ref_name }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
