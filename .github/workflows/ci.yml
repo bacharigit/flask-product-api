@@ -36,6 +36,11 @@ jobs:
         runs-on: ubuntu-latest
 
 
+        env:
+            DB_PASSWORD: ci-test-password
+            DB_NAME: store
+
+
         steps:
           - name: Check out repository
             uses: actions/checkout@v6
@@ -52,7 +57,91 @@ jobs:
 
 
           - name: Verify Gunicorn
-            run: docker run --rm bacharidocker/flask-product-api:ci gunicorn --version
+            run: docker run --rm bacharidocker/flask-product-api:ci gunicorn  --version
+
+
+          - name: Start MySQl
+            run: |
+                docker compose up -d mysql
+
+          - name: Wait for MySQL to become healthy
+            run: |
+
+                for i in {1..30}; do
+                    STATUS=$(docker inspect \
+                        --format='{{.State.Health.Status}}' \
+                        "$(docker compose ps -q mysql)" 2>/dev/null || true)
+
+                    echo "MySQL health: $STATUS"
+
+                    if [ "$STATUS" = "healthy" ]; then
+                        exit 0
+                    fi
+
+
+                    sleep 2
+                done
+
+                echo "MySQL did not become healthy"
+                docker compose logs mysql
+                exit 1
+
+
+
+          - name: Start Flask application
+            run: |
+                MYSQL_NETWORK=$(docker inspect \
+                    --format='{{range $name, $network := .NetworkSettings.Networks}}{{$name}}{{end}}' \
+                    "$(docker compose ps -q mysql)")
+
+                docker run -d \
+                    --name flask-ci \
+                    --network "$MYSQL_NETWORK" \
+                    -e DB_HOST=mysql \
+                    -e DB_NAME=store \
+                    -e DB_USER=root \
+                    -e DB_PASSWORD=ci-test-password \
+                    -p 5001:5000 \
+                    bacharidocker/flask-product-api:ci
+
+
+
+
+          - name: Wait for Flask application
+            run: |
+                for i in {1..30}; do
+                    if curl --fail --silent http://localhost:5001/api/hello > /dev/null; then
+                        echo "Flask application is responding"
+                        exit 0
+                    fi
+
+                    echo "Waiting for Flask application..."
+                    sleep 2
+                done
+
+                echo "Flask application did not start"
+                docker logs flask-ci
+                exit 1
+
+
+          - name: Test products endpoint
+            run: |
+                curl --fail --silent http://localhost:5001/api/products
+
+
+          - name: Show Flask logs
+            if: always()
+            run: |
+                docker logs flask-ci || true
+
+
+          - name: Cleanup
+            if: always()
+            run: |
+                docker rm -f flask-ci || true
+                docker compose down -v || true
+
+
 
 
 
@@ -83,21 +172,4 @@ jobs:
                 context: ./flask
                 push: true
                 tags: bacharidocker/flask-product-api:${{ github.ref_name }}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
