@@ -56,11 +56,11 @@ jobs:
                 test "$(docker run --rm bacharidocker/flask-product-api:ci whoami)" = "appuser"
 
 
-          - name: Verify Gunicorn
+          - name: Verify Gunicorn is installed
             run: docker run --rm bacharidocker/flask-product-api:ci gunicorn  --version
 
 
-          - name: Start MySQl
+          - name: Start MySQL
             run: |
                 docker compose up -d mysql
 
