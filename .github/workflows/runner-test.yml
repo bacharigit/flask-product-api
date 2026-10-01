@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Show version
         run: echo "Deploying ${{ inputs.version }}"
- 
+
       - name: Show runner information
         run: |
           echo "Hostname:"
