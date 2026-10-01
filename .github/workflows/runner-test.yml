@@ -3,10 +3,6 @@ name: Self-hosted Runner Test
 on:
   workflow_dispatch:
 
-  push:
-    branches:
-      - devops-learning 
-
 jobs:
   test-runner:
     runs-on: [self-hosted, linux, x64, lan-deploy]
