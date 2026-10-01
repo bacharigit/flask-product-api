@@ -1,0 +1,23 @@
+name: Self-hosted Runner Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-runner:
+    runs-on: [self-hosted, linux, x64, lan-deploy]
+
+    steps:
+      - name: Show runner information
+        run: |
+          echo "Hostname:"
+          hostname
+
+          echo "IP addresses:"
+          hostname -I
+
+          echo "User:"
+          whoami
+
+          echo "Architecture:"
+          uname -m
