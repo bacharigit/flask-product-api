@@ -2,12 +2,20 @@ name: Self-hosted Runner Test
 
 on:
   workflow_dispatch:
-
+  inputs:
+    version:
+      description: "Docker image version"
+      required: true
+      default: "v1.3.1"
 jobs:
+
   test-runner:
     runs-on: [self-hosted, linux, x64, lan-deploy]
 
     steps:
+      - name: Show version
+        run: echo "Deploying ${{ inputs.version }}"
+ 
       - name: Show runner information
         run: |
           echo "Hostname:"
