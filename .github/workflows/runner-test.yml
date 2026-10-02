@@ -1,9 +1,7 @@
 name: Self-hosted Runner Test
 
 on:
-  push:
-    branches:
-      - devops-learning
+  workflow_dispatch
 
 jobs:
   test-runner:
