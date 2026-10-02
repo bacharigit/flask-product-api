@@ -143,6 +143,17 @@ jobs:
 
 
 
+    deploy-test:
+        name: Test production SSH
+        needs: build
+        runs-on: [self-hosted, linux, x64, lan-deploy]
+
+        steps:
+          - name: Test production SSH
+            run: |
+                ssh production-lab "whoami && hostname && docker ps"
+
+
 
 
     publish:
