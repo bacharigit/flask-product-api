@@ -21,3 +21,5 @@ jobs:
 
           echo "Architecture:"
           uname -m
+
+          echo "the test is completed now"
