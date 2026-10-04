@@ -148,6 +148,7 @@ jobs:
         needs: build
         runs-on: [self-hosted, linux, x64, lan-deploy]
 
+
         steps:
           - name: Test production SSH
             run: |
@@ -183,4 +184,33 @@ jobs:
                 context: ./flask
                 push: true
                 tags: bacharidocker/flask-product-api:${{ github.ref_name }}
+
+
+
+
+
+    deploy:
+        name: Deploy to production
+        needs: publish
+        runs-on: [self-hosted, linux, x64, lan-deploy]
+
+        steps:
+          - name: Deploy to production
+            run: |
+                ssh production-lab \
+                    "cd /opt/flask-product-api && ./deploy.sh ${{ github.ref_name }}"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
