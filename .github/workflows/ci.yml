@@ -115,12 +115,15 @@ jobs:
                         exit 0
                     fi
 
-                    echo "Waiting for Flask application..."
+                    echo "Waiting for Flask application...($i/30)"
                     sleep 2
                 done
 
                 echo "Flask application did not start"
+                echo "Flak logs:"
                 docker logs flask-ci
+                echo "MySQL logs:"
+                docker compose logs mysql
                 exit 1
 
 

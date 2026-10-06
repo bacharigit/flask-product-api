@@ -1,3 +1,5 @@
+import time
+
 from flask import Flask
 
 from app.extensions import db
@@ -23,6 +25,19 @@ def create_app(config=Config):
     register_error_handlers(app)
 
     with app.app_context():
-        db.create_all()
+        for attempt in range(10):
+            try:
+                db.create_all()
+                break
+            except Exception as exc:
+                if attempt == 9:
+                    raise
+
+                print(
+                    f"Database not ready, retrying in 2 seconds... "
+                    f"({attempt + 1}/10)"
+                )
+                print(f"Database error: {exc}")
+                time.sleep(2)
 
     return app
