@@ -1,7 +1,7 @@
 services:
 
     flask:
-        image: bacharidocker/flask-product-api:v1.3.1
+        image: bacharidocker/flask-product-api:${IMAGE_TAG}
 
         ports:
           - "5000:5000"

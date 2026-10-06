@@ -195,22 +195,15 @@ jobs:
         runs-on: [self-hosted, linux, x64, lan-deploy]
 
         steps:
+          - name: Check out repository
+            uses: actions/checkout@v6
+
+          - name: Copy production configuration
+            run: |
+                scp compose.production.yml deploy.sh production-lab:/opt/flask-product-api/
+
           - name: Deploy to production
             run: |
                 ssh production-lab \
-                    "cd /opt/flask-product-api && ./deploy.sh ${{ github.ref_name }}"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    "cd /opt/flask-product-api && chmod +x ./deploy.sh && ./deploy.sh ${{ github.ref_name }}"
 
