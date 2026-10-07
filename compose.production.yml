@@ -2,7 +2,6 @@ services:
 
     flask:
         image: bacharidocker/flask-product-api:${IMAGE_TAG}
-        command: ["gunicorn", "--bind", "0.0.0.0:5000", "main:does_not_exist"]
         ports:
           - "5000:5000"
 
