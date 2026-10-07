@@ -48,6 +48,14 @@ fi
 
 echo "Deployment complete"
 
+
+RUNNING_IMAGE=$(docker inspect \
+    "$(docker compose --env-file .env -f compose.production.yml ps -q flask)" \
+    --format '{{.Config.Image}}')
+
+echo "Running image: ${RUNNING_IMAGE}"
+echo
+
 IMAGE_TAG="$IMAGE_TAG" docker compose \
   --env-file .env \
   -f compose.production.yml \
