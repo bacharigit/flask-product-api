@@ -111,6 +111,8 @@ project-root/
 ├── docker-compose.yml
 ├── compose.production.yml
 ├── README.md
+├── nginx/
+│   └── default.conf
 ├── flask/
 │   ├── .dockerignore
 │   ├── Dockerfile
@@ -421,6 +423,157 @@ This allows the production environment to return to the previous known-good imag
 
 ---
 
+# Nginx Reverse Proxy and Troubleshooting
+
+## Overview
+
+Nginx is used as a reverse proxy in an isolated DevOps learning environment.
+
+It receives HTTP requests from clients and forwards them to the Flask API running inside Docker Compose.
+
+```text
+Client
+  |
+  | HTTP :8080
+  v
+Nginx container
+  |
+  | Docker network
+  v
+Flask container :5000
+  |
+  v
+MySQL container
+```
+
+The lab exposes Nginx on host port `8080` because port `80` is already in use on the development machine.
+
+Nginx configuration:
+
+```text
+nginx/default.conf
+```
+
+## Reverse Proxy Configuration
+
+The Nginx configuration forwards incoming requests to the Flask service:
+
+```nginx
+location / {
+    proxy_pass http://flask:5000;
+}
+```
+
+The hostname `flask` resolves to the Flask service through the Docker Compose network.
+
+The configuration also forwards request headers and defines proxy timeouts.
+
+## Service Health Checks
+
+The Flask container has a Docker health check that requests:
+
+```text
+http://127.0.0.1:5000/api/hello
+```
+
+The check helps Docker distinguish between a running container and an application that responds successfully to the health-check request.
+
+Nginx uses the following Compose dependency:
+
+```yaml
+depends_on:
+  flask:
+    condition: service_healthy
+```
+
+This makes Compose wait for Flask to become healthy before starting Nginx during startup.
+
+A health check detects failures but does not, by itself, restart an unhealthy container.
+
+## Running the Nginx Lab
+
+Start the isolated lab using the versioned Flask image:
+
+```bash
+IMAGE_TAG=v1.4.2 docker compose -p nginx-lab \
+  --env-file .env \
+  -f compose.production.yml up -d
+```
+
+Check service status:
+
+```bash
+IMAGE_TAG=v1.4.2 docker compose -p nginx-lab \
+  --env-file .env \
+  -f compose.production.yml ps
+```
+
+Test the API through Nginx:
+
+```bash
+curl -i http://localhost:8080/api/hello
+```
+
+Expected result:
+
+```text
+HTTP/1.1 200 OK
+```
+
+## Nginx Logging
+
+View Nginx access and error logs through Docker Compose:
+
+```bash
+IMAGE_TAG=v1.4.2 docker compose -p nginx-lab \
+  --env-file .env \
+  -f compose.production.yml logs --tail=30 nginx
+```
+
+Access logs record HTTP requests and their response status codes.
+
+Examples observed during testing:
+
+- `200 OK`: the API request succeeded.
+- `404 Not Found`: the requested endpoint does not exist.
+- `502 Bad Gateway`: often indicates an upstream connection failure or invalid upstream response.
+- `504 Gateway Timeout`: an upstream operation timed out.
+
+## Failure Testing and Recovery
+
+A backend failure was simulated by stopping the Flask service:
+
+```bash
+docker compose -p nginx-lab \
+  --env-file .env \
+  -f compose.production.yml stop flask
+```
+
+A request to the API then returned `504 Gateway Timeout` in this lab. The Nginx error log reported an upstream connection timeout.
+
+Flask was started again:
+
+```bash
+IMAGE_TAG=v1.4.2 docker compose -p nginx-lab \
+  --env-file .env \
+  -f compose.production.yml up -d flask
+```
+
+The API was tested again and returned `200 OK`.
+
+### Lessons Learned
+
+- Nginx acts as a reverse proxy for the Flask API.
+- Docker Compose service names can be used for communication between containers on the same network.
+- Health checks monitor application responsiveness.
+- Compose startup dependencies can wait for a service to become healthy.
+- Access logs show request outcomes; error logs help explain failures.
+- Backend recovery should be verified by testing the API again.
+
+**Note:** The `nginx-lab` Compose project is an isolated learning environment. Changes to `compose.production.yml` must be reviewed before they are used for an actual production deployment.
+
+
+
 # Security Practices
 
 The project intentionally avoids committing secrets.
@@ -523,22 +676,23 @@ Implemented:
 
 # Future DevOps Roadmap
 
-Planned improvements:
-
-1. Automated rollback testing
-2. Cloud VM deployment
-3. GitHub-hosted runner → cloud VM deployment
-4. Nginx reverse proxy
-5. HTTPS with Let's Encrypt
-6. Application healthchecks
-7. Centralized logging
-8. Monitoring
-9. Kubernetes
+1. Nginx reverse proxy and troubleshooting
+2. HTTPS with TLS certificates and Let's Encrypt
+3. Application and container health checks
+4. Centralized logging with the Elastic Stack (Elasticsearch, Logstash, Kibana)
+5. Monitoring and dashboards with Prometheus and Grafana
+6. Alerting and incident troubleshooting
+7. Terraform and Infrastructure as Code
+8. Cloud VM deployment
+9. Kubernetes fundamentals
 10. Kubernetes Deployments and Services
-11. ConfigMaps and Secrets
-12. Persistent Volumes
+11. ConfigMaps, Secrets, and Persistent Volumes
+12. Kubernetes health probes and resource management
 13. Helm
 14. Kubernetes-based CI/CD
+15. Final cloud deployment with monitoring, logging, security, and recovery testing
+
+
 
 ---
 
