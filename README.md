@@ -571,8 +571,106 @@ The API was tested again and returned `200 OK`.
 - Backend recovery should be verified by testing the API again.
 
 **Note:** The `nginx-lab` Compose project is an isolated learning environment. Changes to `compose.production.yml` must be reviewed before they are used for an actual production deployment.
+## HTTPS with a Self-Signed Certificate
 
+### Overview
 
+The Nginx reverse proxy supports both HTTP and HTTPS in the local development lab.
+
+- HTTP endpoint: `http://localhost:8080`
+- HTTPS endpoint: `https://localhost:8443`
+- Nginx listens on container ports `80` (HTTP) and `443` (HTTPS).
+- Docker Compose maps host port `8080` to Nginx port `80`, and host port `8443` to Nginx port `443`.
+- Nginx terminates TLS and forwards requests to the Flask application over the internal Docker network using HTTP at `flask:5000`.
+
+### Certificate generation
+
+A self-signed certificate was generated using OpenSSL for local testing.
+
+The certificate includes these Subject Alternative Names (SANs):
+
+- `DNS:localhost`
+- `IP Address:127.0.0.1`
+
+The local certificate files are stored in `nginx/certs/`:
+
+- `localhost.crt`: the certificate presented by Nginx.
+- `localhost.key`: the corresponding private key.
+
+The certificate directory and private key files are excluded from Git using `.gitignore`. **Never commit private keys to the repository.**
+
+To inspect the certificate:
+
+```bash
+openssl x509 -in nginx/certs/localhost.crt \
+  -noout -subject -issuer -dates -ext subjectAltName
+```
+
+### Testing HTTP and HTTPS
+
+Test the HTTP endpoint:
+
+```bash
+curl -I http://localhost:8080/api/hello
+```
+
+Test HTTPS with normal certificate verification:
+
+```bash
+curl -I https://localhost:8443/api/hello
+```
+
+Because the certificate is self-signed and is not trusted by default, this request normally fails certificate verification.
+
+For local testing, explicitly trust the generated certificate:
+
+```bash
+curl --cacert nginx/certs/localhost.crt \
+  -I https://localhost:8443/api/hello
+```
+
+This should return `HTTP/1.1 200 OK` when the services are running correctly.
+
+The `-k` option can also bypass certificate verification:
+
+```bash
+curl -k -I https://localhost:8443/api/hello
+```
+
+Use `-k` only for temporary troubleshooting. It disables certificate verification and should not be used as a production solution.
+
+### Verifying TLS
+
+Verify the certificate presented by Nginx:
+
+```bash
+openssl s_client \
+  -connect localhost:8443 \
+  -servername localhost \
+  -CAfile nginx/certs/localhost.crt \
+  -verify_return_error </dev/null
+```
+
+A successful verification should report:
+
+```text
+Verify return code: 0 (ok)
+```
+
+### Troubleshooting
+
+- **Connection refused:** Check that the Nginx container is running and host port `8443` is published.
+- **Certificate is self-signed:** Use the local certificate with `curl --cacert` for testing.
+- **Nginx fails to start:** Inspect Nginx logs and verify that the certificate and private key paths are correct.
+- **502 or 504 response:** Check whether Flask is healthy and reachable through the Compose network, then inspect Nginx error logs.
+
+### Security notes
+
+- The certificate is self-signed and intended for local development only.
+- The private key must remain secret and must not be committed to Git.
+- `curl -k` disables certificate verification and does not establish that the server's identity is trusted.
+- A public deployment should use a certificate issued by a trusted certificate authority, with a valid domain and appropriate renewal procedures.
+- HTTPS protects traffic between the client and Nginx. In this configuration, traffic from Nginx to Flask uses HTTP over the internal Docker network.
 
 # Security Practices
 
