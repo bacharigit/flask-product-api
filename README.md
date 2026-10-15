@@ -672,6 +672,82 @@ Verify return code: 0 (ok)
 - A public deployment should use a certificate issued by a trusted certificate authority, with a valid domain and appropriate renewal procedures.
 - HTTPS protects traffic between the client and Nginx. In this configuration, traffic from Nginx to Flask uses HTTP over the internal Docker network.
 
+
+## Monitoring: Prometheus, Grafana, and cAdvisor
+
+This project includes a separate monitoring stack for observing container resource usage and monitoring Prometheus scrape targets.
+
+### Architecture
+
+- **Prometheus** collects metrics every 15 seconds.
+- **cAdvisor** exposes container resource metrics, including CPU and memory usage.
+- **Grafana** visualizes metrics and evaluates alert rules.
+
+### Start the monitoring stack
+
+From the project root, run:
+
+```bash
+docker compose -p monitoring-lab -f compose.monitoring.yml up -d
+```
+
+### Access the services
+
+| Service | Local URL |
+|---|---|
+| Prometheus | http://localhost:9090 |
+| Prometheus targets | http://localhost:9090/targets |
+| Grafana | http://localhost:3000 |
+| cAdvisor metrics | http://localhost:8081/metrics |
+
+These ports are intended for the local development lab. Do not expose the monitoring services publicly without appropriate access controls.
+
+### Grafana setup
+
+1. Sign in to Grafana and change the default password when prompted.
+2. Add Prometheus as a data source using `http://prometheus:9090`.
+3. Create a dashboard with panels for target status, container memory usage, and container CPU usage.
+4. Create an alert rule named `cAdvisor Target Down` using the PromQL expression:
+
+   ```promql
+   up{job="cadvisor"}
+   ```
+
+   Configure the rule to trigger when the value is below `1`.
+
+### Verify monitoring
+
+Check the Prometheus targets page and confirm both the Prometheus and cAdvisor targets are `UP`.
+
+Test alerting by stopping cAdvisor:
+
+```bash
+docker compose -p monitoring-lab -f compose.monitoring.yml stop cadvisor
+```
+
+Confirm that the `CAdvisor Target Down` alert fires in Grafana. Restore the service afterward:
+
+```bash
+docker compose -p monitoring-lab -f compose.monitoring.yml start cadvisor
+```
+
+After Prometheus detects recovery, verify that the alert returns to `Normal`.
+
+### Stop the monitoring stack
+
+```bash
+docker compose -p monitoring-lab -f compose.monitoring.yml down
+```
+
+Named volumes preserve Prometheus and Grafana data when the stack is stopped this way. To remove the volumes as well, use `down -v`; this deletes the monitoring stack's persisted data.
+
+### Important notes
+
+- The monitoring stack runs as a separate Compose project named `monitoring-lab`.
+- The cAdvisor configuration uses elevated privileges and read-only host mounts for local container monitoring. Treat this setup as a development lab, not a production security baseline.
+- An alert entering the `Firing` state does not guarantee that email delivery works; SMTP must be configured and tested separately.
+
+
 # Security Practices
 
 The project intentionally avoids committing secrets.
