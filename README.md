@@ -104,28 +104,47 @@ Production server
 ## Project Structure
 
 ```text
-project-root/
-├── .gitignore
-├── .env
-├── .env.example
-├── docker-compose.yml
+.
+├── compose.logging.yml
+├── compose.monitoring.yml
 ├── compose.production.yml
+├── deploy.sh
+├── docker-compose.yml
 ├── README.md
-├── nginx/
-│   └── default.conf
 ├── flask/
-│   ├── .dockerignore
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── requirements-dev.txt
-│   ├── main.py
-│   ├── config.py
 │   ├── app/
+│   │   ├── errors/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── routes/
+│   │   └── services/
+│   ├── config.py
+│   ├── Dockerfile
+│   ├── main.py
+│   ├── requirements-dev.txt
+│   ├── requirements.txt
 │   └── tests/
-└── mysql/
-    └── init/
-        └── 00-create-test-db.sql
+├── logging/
+│   ├── filebeat/
+│   │   └── filebeat.yml
+│   └── logstash/
+│       └── pipeline/
+│           └── logstash.conf
+├── monitoring/
+│   ├── Dockerfile
+│   ├── health_check.py
+│   └── prometheus/
+│       └── prometheus.yml
+├── mysql/
+│   └── init/
+│       └── 00-create-test-db.sql
+└── nginx/
+    └── default.conf
 ```
+
+**Note:** The tree shows the main project files and configuration. Local TLS certificates, generated log files, and temporary test utilities are omitted intentionally.
+
+
 
 ---
 
@@ -848,23 +867,99 @@ Implemented:
 
 ---
 
+# Monitoring, Logging, and Alerting
+
+## Prometheus and Grafana
+
+**Status: Implemented and tested in the local lab**
+
+- Prometheus metrics collection and target monitoring
+- cAdvisor container resource metrics
+- Grafana dashboards for monitoring
+- Alert rule for detecting a down cAdvisor target
+- Tested alert behavior by stopping and restoring cAdvisor
+
+## ELK Stack
+
+**Status: Implemented and tested in the local lab**
+
+- Filebeat collects Docker and health-check logs
+- Logstash processes logs and forwards them to Elasticsearch
+- Elasticsearch stores indexed log data
+- Kibana dashboards visualize API health, response times, and failed health checks
+- Kibana alert rules detect API downtime and slow responses
+- Tested alert conditions by simulating API failures and slow responses
+- Configured and tested a Server log connector for alert actions
+
+**Remaining improvements:** External notifications such as email, Slack, or Microsoft Teams, plus improved incident response documentation.
+
 # Future DevOps Roadmap
 
-1. Nginx reverse proxy and troubleshooting
-2. HTTPS with TLS certificates and Let's Encrypt
-3. Application and container health checks
-4. Centralized logging with the Elastic Stack (Elasticsearch, Logstash, Kibana)
-5. Monitoring and dashboards with Prometheus and Grafana
-6. Alerting and incident troubleshooting
-7. Terraform and Infrastructure as Code
-8. Cloud VM deployment
-9. Kubernetes fundamentals
-10. Kubernetes Deployments and Services
-11. ConfigMaps, Secrets, and Persistent Volumes
-12. Kubernetes health probes and resource management
-13. Helm
-14. Kubernetes-based CI/CD
-15. Final cloud deployment with monitoring, logging, security, and recovery testing
+**Status: Core lab implemented**
+
+- Prometheus and Grafana for container monitoring and dashboards
+- cAdvisor metrics and Prometheus target monitoring
+- Centralized logging with Elasticsearch, Logstash, Filebeat, and Kibana
+- Kibana dashboards for API health, response times, and failed health checks
+- Kibana alert rules for API downtime and slow responses
+- Server log connector configured and tested for alert actions
+- Failure simulation, log investigation, and recovery validation
+
+**Remaining improvements:**
+- Configure external notifications such as email, Slack, or Microsoft Teams
+- Improve alert documentation and incident response procedures
+
+## 2. Ansible
+
+**Status: Next stage**
+
+- Set up an Ansible control node and managed Linux hosts
+- Configure inventory, SSH access, and privilege escalation
+- Learn ad-hoc commands, playbooks, variables, facts, and templates
+- Use handlers, roles, and reusable task structures
+- Practice idempotency, check mode, and safe configuration changes
+- Automate Linux host preparation, Docker installation, and Docker Compose configuration
+- Automate application deployment to the private lab
+- Validate deployments and integrate Ansible with the existing CI/CD pipeline where appropriate
+
+## 3. Production Readiness and Security
+
+- Review SSH access, firewall rules, and least-privilege permissions
+- Manage secrets safely and separate development from production configuration
+- Implement and test database backup and recovery procedures
+- Validate health checks, deployment rollback, and service recovery
+- Review reverse-proxy configuration and HTTPS certificate management
+- Improve monitoring, logging, alerting, and troubleshooting documentation
+
+## 4. Kubernetes
+
+- Set up a local Kubernetes environment using kind, Minikube, or k3d
+- Learn Pods, Deployments, and Services
+- Configure ConfigMaps and Secrets
+- Work with Persistent Volumes and Persistent Volume Claims
+- Configure health probes, resource requests, and limits
+- Practice networking, application troubleshooting, and Helm
+- Deploy the Flask API and integrate Kubernetes deployment with CI/CD
+
+## 5. Terraform and Cloud Infrastructure
+
+- Learn Terraform providers, resources, variables, outputs, and state
+- Organize infrastructure with reusable modules
+- Provision infrastructure using Infrastructure as Code
+- Combine Terraform provisioning with Ansible configuration management
+- Plan cloud deployment, networking, access controls, and cost management
+- Deploy to a cloud VM when the local and private-lab work is ready
+
+## 6. Advanced Integrations and Portfolio
+
+- Integrate deployment and monitoring workflows
+- Explore external alert notifications and incident automation
+- Document architecture, setup, troubleshooting, rollback, and recovery
+- Improve the project README and operational runbooks
+- Prepare a reproducible end-to-end DevOps portfolio demonstration
+
+**Guiding principle:** Complete and validate as much as possible in the existing local and private lab before introducing public cloud infrastructure. Cloud deployment and final end-to-end validation come later.
+
 
 
 

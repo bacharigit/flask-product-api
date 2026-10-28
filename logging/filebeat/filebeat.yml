@@ -1,0 +1,32 @@
+
+filebeat.inputs:
+  # Existing input: Docker container logs
+  - type: filestream
+    id: docker-container-logs
+    prospector.scanner.symlinks: true
+    parsers:
+      - container:
+          format: docker
+    paths:
+      - /var/lib/docker/containers/*/*-json.log
+
+
+  # New input: API health-check logs
+  - type: filestream
+    id: api-health-check-logs
+    paths:
+      - /usr/share/filebeat/monitoring/health_check.json.log
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+
+
+processors:
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

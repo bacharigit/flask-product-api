@@ -38,6 +38,19 @@ services:
             TEST_DB_NAME: store_test
 
 
+    health-check:
+        build:
+            context: ./monitoring
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        depends_on:
+            - flask
+        volumes:
+            - ./monitoring:/monitoring
+        command: sh -c "python -u health_check.py >> /monitoring/health_check.json.log 2>&1"
+
+
+
     mysql:
         image: mysql:8.0
 

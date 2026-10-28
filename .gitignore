@@ -1,3 +1,14 @@
+# Generated logs
+*.log
+
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+
+
 .env
 __pycache__/
 *.pyc
