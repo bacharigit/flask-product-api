@@ -1,0 +1,20 @@
+---
+- name: Learn Ansible templates
+  hosts: flask_servers
+  gather_facts: true
+  become: true
+
+  vars:
+    app_name: flask-product-api
+    app_environment: learning
+    app_port: 5000
+    app_directory: /opt/flask-product-api
+
+  tasks:
+    - name: Generate application configuration
+      ansible.builtin.template:
+        src: templates/app.conf.j2
+        dest: /opt/ansible-learning/app.conf
+        owner: hosseinb
+        group: hosseinb
+        mode: '0644'

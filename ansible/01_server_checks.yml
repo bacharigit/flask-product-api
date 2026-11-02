@@ -1,0 +1,46 @@
+---
+- name: Check managed server
+  hosts: flask_servers
+  gather_facts: true
+
+  tasks:
+    - name: Display hostname
+      ansible.builtin.debug:
+        var: ansible_hostname
+
+    - name: Display operating system
+      ansible.builtin.debug:
+        var: ansible_distribution
+
+    - name: Display total memory
+      ansible.builtin.debug:
+        var: ansible_memtotal_mb
+
+    - name: Check root filesystem space
+      ansible.builtin.command:
+        argv:
+          - df
+          - -h
+          - /
+      register: disk_usage
+      changed_when: false
+
+    - name: Display root filesystem space
+      ansible.builtin.debug:
+        var: disk_usage.stdout_lines
+
+    - name: Check whether memory meets the threshold
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= 2000
+        success_msg: "Memory check passed."
+        fail_msg: "Memory is below the configured threshold."
+
+    - name: Ensure Ansible learning directory exists
+      become: true
+      ansible.builtin.file:
+        path: /opt/ansible-learning
+        state: directory
+        owner: hosseinb
+        group: hosseinb
+        mode: '0755'

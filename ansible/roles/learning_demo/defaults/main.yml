@@ -1,0 +1,3 @@
+---
+learning_message: "Hello from an Ansible role!"
+learning_directory: /opt/ansible-learning

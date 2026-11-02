@@ -1,0 +1,4 @@
+---
+- name: Confirm role configuration update
+  ansible.builtin.debug:
+    msg: "The role configuration was updated!"

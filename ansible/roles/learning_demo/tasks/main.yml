@@ -1,0 +1,29 @@
+---
+- name: Display role message
+  ansible.builtin.debug:
+    msg: "{{ learning_message }}"
+
+
+- name: Create role configuration file
+  ansible.builtin.copy:
+    dest: "{{ learning_directory }}/role.conf"
+    content: |
+      application: flask-product-api
+      environment: learning
+    owner: hosseinb
+    group: hosseinb
+    mode: '0644'
+  notify: Confirm role configuration update
+
+- name: Check learning directory
+  ansible.builtin.stat:
+    path: "{{ learning_directory }}"
+  register: role_directory
+
+- name: Confirm learning directory exists
+  ansible.builtin.assert:
+    that:
+      - role_directory.stat.exists
+      - role_directory.stat.isdir
+    success_msg: "Role validation successful."
+

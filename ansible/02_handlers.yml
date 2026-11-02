@@ -1,0 +1,23 @@
+---
+- name: Learn Ansible handlers
+  hosts: flask_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Create learning configuration file
+      ansible.builtin.copy:
+        dest: /opt/ansible-learning/app.conf
+        content: |
+          application_name: flask-product-api
+          environment: learning
+          status: configured
+        owner: hosseinb
+        group: hosseinb
+        mode: '0644'
+      notify: Confirm configuration update
+
+  handlers:
+    - name: Confirm configuration update
+      ansible.builtin.debug:
+        msg: "The learning configuration file changed."

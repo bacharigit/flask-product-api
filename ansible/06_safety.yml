@@ -1,0 +1,34 @@
+---
+- name: Learn Ansible safety features
+  hosts: flask_servers
+  gather_facts: false
+
+  tasks:
+    - name: Display server preparation message
+      ansible.builtin.debug:
+        msg: "Preparing the server."
+      tags:
+        - preparation
+
+    - name: Check learning directory
+      ansible.builtin.stat:
+        path: /opt/ansible-learning
+      register: learning_directory
+      tags:
+        - validation
+
+    - name: Confirm learning directory exists
+      ansible.builtin.assert:
+        that:
+          - learning_directory.stat.exists
+          - learning_directory.stat.isdir
+        success_msg: "Learning directory exists."
+        fail_msg: "Learning directory is missing."
+      tags:
+        - validation
+
+    - name: Demonstrate successful task
+      ansible.builtin.debug:
+        msg: "The safety exercise completed successfully."
+      tags:
+        - validation

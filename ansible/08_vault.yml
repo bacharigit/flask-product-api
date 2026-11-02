@@ -1,0 +1,19 @@
+---
+- name: Learn Ansible Vault variables
+  hosts: flask_servers
+  gather_facts: false
+
+  tasks:
+    - name: Display database username
+      ansible.builtin.debug:
+        var: db_user
+
+    - name: Display database name
+      ansible.builtin.debug:
+        var: db_name
+
+    - name: Confirm database password is loaded
+      ansible.builtin.debug:
+        msg: "Database password successfully loaded from Ansible Vault."
+      when: db_password is defined
+      no_log: true

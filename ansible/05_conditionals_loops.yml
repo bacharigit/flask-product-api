@@ -1,0 +1,35 @@
+---
+- name: Learn conditionals and loops
+  hosts: flask_servers
+  gather_facts: true
+
+  vars:
+    app_environment: learning
+    required_memory_mb: 2000
+    required_packages:
+      - curl
+      - git
+      - wget
+
+  tasks:
+    - name: Check whether server has enough memory
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb >= required_memory_mb
+        success_msg: "Server has enough memory."
+        fail_msg: "Server does not have enough memory."
+
+    - name: Display learning environment message
+      ansible.builtin.debug:
+        msg: "This is the learning environment."
+      when: app_environment == "learning"
+
+    - name: Display production environment message
+      ansible.builtin.debug:
+        msg: "This is the production environment."
+      when: app_environment == "production"
+
+    - name: Display required package names
+      ansible.builtin.debug:
+        msg: "Required package: {{ item }}"
+      loop: "{{ required_packages }}"

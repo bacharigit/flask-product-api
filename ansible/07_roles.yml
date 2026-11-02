@@ -1,0 +1,7 @@
+---
+- name: Learn Ansible roles
+  hosts: flask_servers
+  gather_facts: false
+
+  roles:
+    - learning_demo
