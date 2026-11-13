@@ -1,13 +1,20 @@
 name: Self-hosted Runner Test
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/runner-test.yml"
+
 
 jobs:
   test-runner:
     runs-on: [self-hosted, linux, x64, lan-deploy]
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
       - name: Show runner information
         run: |
           echo "Hostname:"
@@ -21,5 +28,29 @@ jobs:
 
           echo "Architecture:"
           uname -m
+
+      - name: Check required tools
+        run: |
+          echo "Python:"
+          python3 --version
+
+          echo "Ansible:"
+          if command -v ansible >/dev/null 2>&1; then
+            ansible --version
+          else
+            echo "Ansible is NOT installed or not in PATH"
+          fi
+
+          echo "SSH:"
+          ssh -V 2>&1
+
+          echo "Git:"
+          git --version
+
+      - name: Test SSH connection
+        run: |
+          ssh production-lab \
+            "whoami && hostname && docker --version"
+
 
           echo "the test is completed now"
