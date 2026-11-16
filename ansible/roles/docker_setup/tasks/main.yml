@@ -1,0 +1,55 @@
+
+---
+- name: Ensure Docker packages are installed
+  become: true
+  ansible.builtin.apt:
+    name: "{{ docker_expected_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Gather installed package information
+  become: true
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Display installed Docker package versions
+  ansible.builtin.debug:
+    msg: "{{ item }} version: {{ ansible_facts.packages[item][0].version }}"
+  loop: "{{ docker_expected_packages }}"
+  when: item in ansible_facts.packages
+
+- name: Ensure Docker service is enabled and running
+  become: true
+  ansible.builtin.service:
+    name: "{{ docker_service_name }}"
+    enabled: true
+    state: started
+
+- name: Check Docker service status
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - "{{ docker_service_name }}"
+  register: docker_service_status
+  changed_when: false
+  failed_when: docker_service_status.stdout != "active"
+
+- name: Display Docker service status
+  ansible.builtin.debug:
+    var: docker_service_status.stdout
+
+
+- name: Verify Docker Compose is installed
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - version
+  register: docker_compose_version
+  changed_when: false
+
+- name: Display Docker Compose version
+  ansible.builtin.debug:
+    var: docker_compose_version.stdout

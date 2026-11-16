@@ -1,0 +1,8 @@
+---
+- name: Prepare Docker server
+  hosts: flask_servers
+  become: true
+  gather_facts: false
+
+  roles:
+    - docker_setup

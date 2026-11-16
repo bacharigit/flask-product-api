@@ -1,0 +1,168 @@
+
+---
+- name: Find currently running Flask container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - .env
+      - -f
+      - "{{ app_compose_file }}"
+      - ps
+      - -q
+      - flask
+  args:
+    chdir: "{{ app_deploy_dir }}"
+  environment:
+    IMAGE_TAG: "{{ app_image_tag }}"
+  register: app_current_id
+  changed_when: false
+
+- name: Ensure an existing deployment is available for rollback
+  ansible.builtin.assert:
+    that:
+      - app_current_id.stdout | trim | length > 0
+    fail_msg: "Cannot deploy safely: no existing Flask container was found."
+
+- name: Inspect currently deployed Flask image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - "--format={{ '{{' }}.Config.Image{{ '}}' }}"
+      - "{{ app_current_id.stdout | trim }}"
+  register: app_current_image
+  changed_when: false
+
+- name: Extract currently deployed image tag
+  ansible.builtin.set_fact:
+    app_current_image_tag: >-
+      {{ app_current_image.stdout | regex_replace('^.*:', '') }}
+
+- name: Display deployment version
+  ansible.builtin.debug:
+    msg:
+      - "Currently deployed version: {{ app_current_image_tag }}"
+      - "Requested deployment version: {{ app_image_tag }}"
+
+- name: Validate requested production configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - .env
+      - -f
+      - "{{ app_compose_file }}"
+      - config
+      - --quiet
+  args:
+    chdir: "{{ app_deploy_dir }}"
+  environment:
+    IMAGE_TAG: "{{ app_image_tag }}"
+  changed_when: false
+
+- name: Pre-pull requested Flask image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --env-file
+      - .env
+      - -f
+      - "{{ app_compose_file }}"
+      - pull
+      - flask
+  args:
+    chdir: "{{ app_deploy_dir }}"
+  environment:
+    IMAGE_TAG: "{{ app_image_tag }}"
+
+- name: Deploy new version with automatic rollback
+  block:
+
+    - name: Start production services
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - .env
+          - -f
+          - "{{ app_compose_file }}"
+          - up
+          - -d
+      args:
+        chdir: "{{ app_deploy_dir }}"
+      environment:
+        IMAGE_TAG: "{{ app_image_tag }}"
+
+    - name: Wait for new version to become healthy
+      ansible.builtin.uri:
+        url: "{{ app_healthcheck_url }}"
+        method: GET
+        status_code: 200
+      register: app_healthcheck
+      until: app_healthcheck.status == 200
+      retries: "{{ app_healthcheck_retries }}"
+      delay: "{{ app_healthcheck_delay }}"
+
+    - name: Confirm successful deployment
+      ansible.builtin.debug:
+        msg: "Deployment of {{ app_image_tag }} succeeded."
+
+  rescue:
+
+    - name: Display deployment failure
+      ansible.builtin.debug:
+        msg: "Deployment failed. Rolling back to {{ app_current_image_tag }}."
+
+    - name: Pull previous production image
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - .env
+          - -f
+          - "{{ app_compose_file }}"
+          - pull
+          - flask
+      args:
+        chdir: "{{ app_deploy_dir }}"
+      environment:
+        IMAGE_TAG: "{{ app_current_image_tag }}"
+
+    - name: Restore previously deployed version
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - .env
+          - -f
+          - "{{ app_compose_file }}"
+          - up
+          - -d
+      args:
+        chdir: "{{ app_deploy_dir }}"
+      environment:
+        IMAGE_TAG: "{{ app_current_image_tag }}"
+
+    - name: Wait for previous Flask version to become healthy
+      ansible.builtin.uri:
+        url: "{{ app_healthcheck_url }}"
+        method: GET
+        status_code: 200
+      register: app_rollback_healthcheck
+      until: app_rollback_healthcheck.status == 200
+      retries: "{{ app_healthcheck_retries }}"
+      delay: "{{ app_healthcheck_delay }}"
+
+    - name: Report failed deployment and successful rollback
+      ansible.builtin.fail:
+        msg: >-
+          Deployment of {{ app_image_tag }} failed.
+          The previous version {{ app_current_image_tag }}
+          was restored successfully.

@@ -1,0 +1,24 @@
+
+---
+- name: Learn Ansible package management
+  hosts: flask_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Ensure curl is installed
+      ansible.builtin.apt:
+        name: curl
+        state: present
+
+    - name: Check curl version
+      ansible.builtin.command:
+        argv:
+          - curl
+          - --version
+      register: curl_version
+      changed_when: false
+
+    - name: Display curl version
+      ansible.builtin.debug:
+        msg: "{{ curl_version.stdout_lines[0] }}"

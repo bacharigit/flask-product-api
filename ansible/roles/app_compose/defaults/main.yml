@@ -1,0 +1,10 @@
+---
+app_deploy_dir: /opt/flask-product-api
+app_image_repository: bacharidocker/flask-product-api
+app_http_port: 8080
+app_https_port: 8443
+app_database_name: store
+app_database_user: root
+app_mysql_image: mysql:8.0
+app_nginx_image: nginx:alpine
+app_compose_file: compose.production.yml

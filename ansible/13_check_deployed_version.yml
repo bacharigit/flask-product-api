@@ -1,0 +1,59 @@
+
+---
+- name: Discover the currently deployed Flask application version
+  hosts: flask_servers
+  gather_facts: false
+
+  vars:
+    app_deploy_dir: /opt/flask-product-api
+    app_compose_file: compose.production.yml
+    app_image_repository: bacharidocker/flask-product-api
+    app_image_tag: v1.4.2
+
+  tasks:
+
+    - name: Find running Flask container
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - --env-file
+          - .env
+          - -f
+          - "{{ app_compose_file }}"
+          - ps
+          - -q
+          - flask
+      args:
+        chdir: "{{ app_deploy_dir }}"
+      environment:
+        IMAGE_TAG: "{{ app_image_tag }}"
+      register: app_container_id
+      changed_when: false
+
+    - name: Ensure Flask container exists
+      ansible.builtin.assert:
+        that:
+          - app_container_id.stdout | trim | length > 0
+        fail_msg: "Flask container was not found."
+
+    - name: Inspect currently running Flask image
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - "--format={{ '{{' }}.Config.Image{{ '}}' }}"
+          - "{{ app_container_id.stdout | trim }}"
+      register: app_running_image
+      changed_when: false
+
+    - name: Extract currently deployed image tag
+      ansible.builtin.set_fact:
+        app_current_image_tag: >-
+          {{ app_running_image.stdout | regex_replace('^.*:', '') }}
+
+    - name: Display currently deployed version
+      ansible.builtin.debug:
+        msg:
+          - "Running image: {{ app_running_image.stdout }}"
+          - "Running version: {{ app_current_image_tag }}"

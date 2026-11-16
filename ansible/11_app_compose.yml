@@ -1,0 +1,7 @@
+---
+- name: Configure production Docker Compose application
+  hosts: flask_servers
+  gather_facts: false
+
+  roles:
+    - app_compose

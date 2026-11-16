@@ -1,0 +1,79 @@
+
+---
+- name: Check that production environment file exists
+  ansible.builtin.stat:
+    path: "{{ app_deploy_dir }}/.env"
+  register: app_env_file
+
+- name: Require existing production environment file
+  ansible.builtin.assert:
+    that:
+      - app_env_file.stat.exists
+      - app_env_file.stat.isreg | default(false)
+    fail_msg: Production .env file is missing.Refusing to continue."
+
+
+- name: Ensure Nginx configuration directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ app_deploy_dir }}/nginx"
+    state: directory
+    owner: hosseinb
+    group: hosseinb
+    mode: "0755"
+
+- name: Ensure Nginx certificates directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ app_deploy_dir }}/nginx/certs"
+    state: directory
+    owner: hosseinb
+    group: hosseinb
+    mode: "0755"
+
+- name: Copy Nginx configuration
+  become: true
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../nginx/default.conf"
+    dest: "{{ app_deploy_dir }}/nginx/default.conf"
+    owner: hosseinb
+    group: hosseinb
+    mode: "0644"
+
+- name: Copy Nginx TLS certificate
+  become: true
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../nginx/certs/localhost.crt"
+    dest: "{{ app_deploy_dir }}/nginx/certs/localhost.crt"
+    owner: hosseinb
+    group: hosseinb
+    mode: "0644"
+
+- name: Copy Nginx TLS private key
+  become: true
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../nginx/certs/localhost.key"
+    dest: "{{ app_deploy_dir }}/nginx/certs/localhost.key"
+    owner: hosseinb
+    group: hosseinb
+    mode: "0600"
+  no_log: true
+
+- name: Protect production environment file
+  become: true
+  ansible.builtin.file:
+    path: "{{ app_deploy_dir }}/.env"
+    owner: hosseinb
+    group: hosseinb
+    mode: "0600"
+    state: file
+
+- name: Generate production Docker Compose file
+  become: true
+  ansible.builtin.template:
+    src: compose.production.yml.j2
+    dest: "{{ app_deploy_dir }}/{{ app_compose_file }}"
+    owner: hosseinb
+    group: hosseinb
+    mode: "0644"
+    backup: true

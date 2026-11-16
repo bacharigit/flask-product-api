@@ -1,0 +1,7 @@
+---
+app_deploy_dir: /opt/flask-product-api
+app_compose_file: compose.production.yml
+app_image_tag: v1.4.2
+app_healthcheck_url: http://127.0.0.1:8080/api/hello
+app_healthcheck_retries: 30
+app_healthcheck_delay: 2
