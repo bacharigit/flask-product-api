@@ -1,0 +1,28 @@
+
+---
+- name: Diagnose private lab server
+  hosts: flask_servers
+  gather_facts: true
+
+  tasks:
+    - name: Display server hostname
+      ansible.builtin.debug:
+        var: ansible_hostname
+
+    - name: Display operating system
+      ansible.builtin.debug:
+        var: ansible_distribution
+
+    - name: Display operating system version
+      ansible.builtin.debug:
+        var: ansible_distribution_version
+
+    - name: Check Docker service
+      ansible.builtin.command:
+        cmd: systemctl is-active docker
+      register: docker_status
+      changed_when: false
+
+    - name: Display Docker service status
+      ansible.builtin.debug:
+        var: docker_status.stdout
