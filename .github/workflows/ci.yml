@@ -161,6 +161,32 @@ jobs:
             -m ping \
             --vault-password-file "$VAULT_PASSWORD_FILE"
 
+
+      - name: Run Ansible server diagnostics
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e
+
+          umask 077
+          VAULT_PASSWORD_FILE=$(mktemp)
+          trap 'rm -f "$VAULT_PASSWORD_FILE"' EXIT
+
+          if [ -z "$ANSIBLE_VAULT_PASSWORD" ]; then
+            echo "Ansible Vault password is missing"
+            exit 1
+          fi
+
+          printf '%s' "$ANSIBLE_VAULT_PASSWORD" > "$VAULT_PASSWORD_FILE"
+
+          echo "Running server diagnostics..."
+
+          ansible-playbook \
+            -i ansible/inventory.ini \
+            ansible/14_server_diagnostics.yml \
+            --vault-password-file "$VAULT_PASSWORD_FILE"
+
+
   publish:
     name: Publish Docker image
     if: startsWith(github.ref, 'refs/tags/v')
