@@ -1,0 +1,8 @@
+---
+- name: Configure and deploy Flask Product API
+  hosts: flask_servers
+  gather_facts: false
+
+  roles:
+    - app_compose
+    - app_deploy
